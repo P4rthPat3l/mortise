@@ -254,6 +254,34 @@ describe("connection state machine", () => {
     expect(harness.connection.get()).toEqual({ phase: "connecting", url: ENDPOINT.url })
   })
 
+  it("AC-1 / §16: a probe network failure reaches failed and retry recovers", async () => {
+    const harness = createHarness({
+      outcome: { kind: "found", endpoint: ENDPOINT },
+      probe: { kind: "unreachable", message: "ECONNREFUSED" },
+    })
+    await harness.connection.start()
+    expect(harness.connection.get()).toEqual({
+      phase: "failed",
+      message: "The OpenCode service could not be reached",
+    })
+
+    harness.setProbe(ok("2.0.26"))
+    await harness.connection.retry()
+    expect(harness.connection.get()).toEqual({ phase: "connecting", url: ENDPOINT.url })
+  })
+
+  it("AC-1 / §16: a failed probe status reaches failed with the status", async () => {
+    const harness = createHarness({
+      outcome: { kind: "found", endpoint: ENDPOINT },
+      probe: { kind: "error", status: 500 },
+    })
+    await harness.connection.start()
+    expect(harness.connection.get()).toEqual({
+      phase: "failed",
+      message: "The OpenCode service returned 500",
+    })
+  })
+
   it("AC-1 / AC-004 / CASE-007: a 401 goes to unauthorized and recovers when the password rotated", async () => {
     const harness = createHarness({
       outcome: { kind: "found", endpoint: ENDPOINT },
