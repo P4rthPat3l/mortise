@@ -9,7 +9,8 @@
       "!**/dist",
       "!docs/research",
       "!.agents/skills",
-      "!.claude/skills"
+      "!.claude/skills",
+      "!packages/engine-opencode/fixtures"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
