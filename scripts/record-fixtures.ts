@@ -1,8 +1,9 @@
 // Records engine responses and one full prompt turn into the adapter's fixtures.
 //
-// Run with `bun scripts/record-fixtures.ts [--version 2.0.26] [--binary installed|bunx]`.
+// Run with `bun scripts/record-fixtures.ts [--version 2.0.26] [--binary installed|bunx|<path>] [--out <dir>]`.
 // It starts its own sandbox and its own scripted provider, records the files below,
-// then stops both. Fixtures are keyed by the engine's reported version.
+// then stops both. Fixtures are keyed by the engine's reported version and normalized so
+// no absolute sandbox or home path is written (`<sandbox>`, `<repo>`, `<home>`).
 //
 //   info.json           GET /api/info
 //   openapi.json        GET /openapi.json
@@ -13,12 +14,15 @@
 //   events-turn.jsonl   every SSE data payload of one prompt turn, one JSON per line
 //   README.md           how each file was produced and what it covers
 import { mkdir, writeFile } from "node:fs/promises"
+import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
   DEFAULT_VERSION,
+  parseSandboxBinary,
   readVersion,
   resolveInstalledBinary,
+  resolveSandboxBinary,
   type SandboxBinary,
   startSandbox,
 } from "./engine-sandbox"
@@ -31,6 +35,7 @@ const TURN_TIMEOUT_MS = 60_000
 interface Options {
   version: string
   binary?: SandboxBinary
+  out?: string
 }
 
 async function main(options: Options): Promise<void> {
@@ -47,8 +52,9 @@ async function main(options: Options): Promise<void> {
     const info = await fetchJson(`${sandbox.url}/api/info`, auth)
     const reportedVersion = asString(asRecord(info)?.version)
     const version = reportedVersion ?? options.version
-    const directory = join(FIXTURES_ROOT, sanitize(version))
+    const directory = join(options.out === undefined ? FIXTURES_ROOT : resolve(options.out), sanitize(version))
     await mkdir(directory, { recursive: true })
+    const replacements = pathReplacements(sandbox.dirs.root)
 
     const openapi = await fetchText(`${sandbox.url}/openapi.json`, auth)
     const session = await postJson(`${sandbox.url}/api/session`, auth, {})
@@ -70,10 +76,18 @@ async function main(options: Options): Promise<void> {
       ["events-turn.jsonl", `${events.map((event) => JSON.stringify(redact(event))).join("\n")}\n`],
     ]
     for (const [name, contents] of files) {
-      await writeFile(join(directory, name), redactText(contents, sandbox.password), "utf8")
+      await writeFile(
+        join(directory, name),
+        redactText(normalizePaths(contents, replacements), sandbox.password),
+        "utf8",
+      )
     }
     const readme = renderReadme({ version, binary, eventTypes: uniqueEventTypes(events) })
-    await writeFile(join(directory, "README.md"), redactText(readme, sandbox.password), "utf8")
+    await writeFile(
+      join(directory, "README.md"),
+      redactText(normalizePaths(readme, replacements), sandbox.password),
+      "utf8",
+    )
 
     console.log(`wrote ${files.length + 1} files to ${directory}`)
   } finally {
@@ -84,6 +98,10 @@ async function main(options: Options): Promise<void> {
 
 async function chooseBinary(options: Options): Promise<SandboxBinary> {
   if (options.binary !== undefined) return options.binary
+  // An engine installed with npm under `.sandbox/cli-<version>/` fetches only this
+  // platform's optional package, unlike `bunx`, so prefer it when it is there.
+  const sandboxed = resolveSandboxBinary(options.version)
+  if (sandboxed !== undefined) return { path: sandboxed }
   const installed = resolveInstalledBinary()
   if (installed === undefined) return "bunx"
   const installedVersion = await readVersion([installed])
@@ -190,7 +208,7 @@ function renderReadme(input: { version: string; binary: SandboxBinary; eventType
   return `# Engine contract fixtures: ${input.version}
 
 Recorded by \`bun scripts/record-fixtures.ts --version ${input.version}\` against a
-private \`opencode serve\` sandbox (\`scripts/engine-sandbox.ts\`, binary: ${input.binary}).
+private \`opencode serve\` sandbox (\`scripts/engine-sandbox.ts\`, binary: ${binaryLabel(input.binary)}).
 
 The sandbox used a temporary \`OPENCODE_DB\` and temporary \`XDG_*\` directories, ran without
 \`--service\`, and was driven by the scripted provider in \`scripts/fake-provider.ts\`. No
@@ -219,7 +237,37 @@ The sandbox password and any field named like a credential (\`apiKey\`, \`passwo
 \`authorization\`, \`client_secret\`, access/refresh tokens) are replaced before writing.
 The provider key here is a throwaway string for the scripted local provider, not a real
 credential.
+
+## Normalization
+
+Absolute paths are replaced before writing so a fixture never carries a machine path: the
+sandbox root becomes \`<sandbox>\`, the repository root \`<repo>\`, and the home directory
+\`<home>\`. Ids, timestamps and every other value are kept exactly as recorded.
 `
+}
+
+function binaryLabel(binary: SandboxBinary): string {
+  return typeof binary === "object" ? binary.path : binary
+}
+
+/**
+ * The ordered path substitutions for {@link normalizePaths}. Most specific first: the
+ * sandbox lives inside the repository, which lives inside the home directory.
+ */
+function pathReplacements(sandboxRoot: string): Array<readonly [string, string]> {
+  return [
+    [sandboxRoot, "<sandbox>"],
+    [REPO_ROOT, "<repo>"],
+    [homedir(), "<home>"],
+  ]
+}
+
+function normalizePaths(text: string, replacements: ReadonlyArray<readonly [string, string]>): string {
+  let result = text
+  for (const [from, to] of replacements) {
+    if (from.length > 0) result = result.split(from).join(to)
+  }
+  return result
 }
 
 function sanitize(version: string): string {
@@ -284,16 +332,14 @@ function asString(value: unknown): string | undefined {
 function parseArgs(argv: readonly string[]): Options {
   let version = DEFAULT_VERSION
   let binary: SandboxBinary | undefined
+  let out: string | undefined
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--version") version = argv[++index] ?? version
-    else if (arg === "--binary") {
-      const value = argv[++index]
-      if (value === "installed" || value === "bunx") binary = value
-      else throw new Error(`--binary must be "installed" or "bunx", got ${String(value)}`)
-    }
+    else if (arg === "--binary") binary = parseSandboxBinary(argv[++index])
+    else if (arg === "--out") out = argv[++index]
   }
-  return { version, binary }
+  return { version, binary, out }
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

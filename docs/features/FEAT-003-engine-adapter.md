@@ -10,8 +10,8 @@ owner: Mortise maintainer
 created: 2026-10-10
 last_updated: 2026-10-10
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 44fc431
-version: 0.1.0
+last_verified_commit: e7726c2
+version: 0.1.1
 tags:
   - engine
   - adapter
@@ -37,7 +37,7 @@ FEAT-002 is reserved for the module system (T-011), so this feature takes the ne
 | Field                 | Details                                                                                          |
 |-----------------------|--------------------------------------------------------------------------------------------------|
 | Document status       | Proposed                                                                                         |
-| Implementation status | Shipped and verified at `44fc431`                                                                 |
+| Implementation status | Shipped and verified at `e7726c2`                                                                 |
 | Owner                 | Mortise maintainer                                                                               |
 | Primary actors        | The composition root (T-012) and the gateway (T-004…T-006) through an injected `fetch`          |
 | Trigger               | A read (session list/get/create, message page, pending requests) or one wire event              |
@@ -45,7 +45,7 @@ FEAT-002 is reserved for the module system (T-011), so this feature takes the ne
 | Entry points          | `packages/engine-opencode/src/index.ts` (`createAdapter`, `translate`)                           |
 | Data stores           | None. The adapter is stateless; credentials live in the gateway (C7)                            |
 | Feature flag          | Not applicable                                                                                   |
-| Last verified         | 2026-10-10 at `44fc431`                                                                           |
+| Last verified         | 2026-10-10 at `e7726c2`                                                                           |
 
 **Status legend.** Every `Status` value below is one of: **Current** (read in the code at `last_verified_commit`) · **Planned** (not implemented) · **Inferred** (not directly verified) · **Unknown**.
 
@@ -59,9 +59,9 @@ UI. ADR-0004 makes one package the translation boundary.
 adapter over any injected `fetch` (the gateway's `engine.fetch`), so the adapter can also be exercised
 against recorded fixtures without an engine.
 
-**How success is measured.** Replaying the T-007 fixtures through a fake `fetch` yields the domain
-values the fixtures describe, and replaying the recorded turn's deltas yields the same timeline as
-mapping its final message list.
+**How success is measured.** Replaying every recorded engine version's fixtures through a fake
+`fetch` yields the domain values the fixtures describe, and replaying each recorded turn's deltas
+yields the same timeline as mapping its final message list.
 
 ## 3. Scope
 
@@ -88,7 +88,7 @@ mapping its final message list.
 | ASM-001 | The generated Promise client accepts an injected `fetch` and covers every read/write the adapter needs. | High | Replayed fixture tests; `bun run check:deps` |
 | ASM-002 | `Identifier.ascending()`'s 12 hex chars + 14 base-62 chars sort by creation order. | High | AC-003 test |
 | ASM-003 | A pure, stateless `translate` is possible for every modeled event.        | High       | AC-002 fixture replay; DEC-003 |
-| ASM-004 | The recorded 2.0.26 turn fixture represents the event shapes across the supported range. | Medium | Re-record per version in T-014 |
+| ASM-004 | The recorded 2.0.20 and 2.0.26 turn fixtures represent the event shapes across the supported range. | High | T-014 version matrix: the same contract assertions pass on both |
 
 ## 7. System Context
 
@@ -149,7 +149,9 @@ file paths, which are not secrets.
 | Timeline | Message page → items | `packages/engine-opencode/src/timeline.ts` | `mapTimeline` | `44fc431` |
 | Requests | Pending permissions/forms and answers | `packages/engine-opencode/src/requests.ts` | `listPendingRequests`, `answerPermission`, … | `44fc431` |
 | Events | Wire event → domain events | `packages/engine-opencode/src/events.ts` | `translate`, `eventDiagnostics` | `44fc431` |
-| Fixtures | Recorded 2.0.26 responses and one turn | `packages/engine-opencode/fixtures/2.0.26/` | `events-turn.jsonl`, `messages.json`, … | `44fc431` |
+| Fixtures | Recorded 2.0.20 and 2.0.26 responses and one turn each | `packages/engine-opencode/fixtures/<version>/` | `events-turn.jsonl`, `messages.json`, … | `e7726c2` |
+| Contract matrix | Replays the adapter against every recorded version | `packages/engine-opencode/src/sessions.test.ts`, `timeline.test.ts`, `events.test.ts` | `describe.each(VERSIONS)` | `e7726c2` |
+| Compatibility diff | Compares two recorded specs and flags adapter-breaking changes | `scripts/diff-openapi.ts` | `compareSpecs` | `e7726c2` |
 
 ### Generated or restricted
 
@@ -190,9 +192,9 @@ file paths, which are not secrets.
 | `session.create` | `POST /api/session` | `SessionSummary` |
 | `session.prompt` | `POST /api/session/{id}/prompt` | — |
 | `session.interrupt` | `POST /api/session/{id}/interrupt` | `boolean` |
-| `message.list` | `GET /api/session/{id}/message` | `TimelineItem[]` |
+| `session.message.list` | `GET /api/session/{id}/message` | `TimelineItem[]` |
 | `permission.request.list` | `GET /api/permission/request` | `PermissionRequest[]` |
-| `permission.reply` | `POST /api/session/{id}/permission/{rid}/reply` | — |
+| `session.permission.reply` | `POST /api/session/{id}/permission/{rid}/reply` | — |
 | `form.list` | `GET /api/form` | `FormRequest[]` |
 | `session.form.reply` | `POST /api/session/{id}/form/{fid}/reply` | — |
 | `session.form.cancel` | `DELETE /api/session/{id}/form/{fid}` | — |
@@ -247,6 +249,14 @@ message page; `info.json` and `openapi.json` are gateway-owned (T-004) and not m
 **When** `bun run check:deps` runs
 **Then** only the Promise root of `@opencode/client` is imported.
 
+### AC-007: Supported engine versions agree — Status: **Current**
+
+**Given** the recorded 2.0.20 and 2.0.26 fixtures
+**When** `bun run test` runs the contract tests once per fixture directory, and
+`bun scripts/diff-openapi.ts` compares the two specs
+**Then** both versions pass the same assertions and the diff reports no adapter operation or
+request field removed, and no new required field the adapter does not send.
+
 ### Edge cases
 
 | Case ID  | Scenario | Expected behavior | Test type |
@@ -266,19 +276,20 @@ message page; `info.json` and `openapi.json` are gateway-owned (T-004) and not m
 
 | Test type | Required coverage | Path |
 |-----------|-------------------|------|
-| Unit | Ids, fixture replay, timeline mapping, request mapping and answers, event translation, counters | `packages/engine-opencode/src/ids.test.ts`, `sessions.test.ts`, `timeline.test.ts`, `requests.test.ts`, `events.test.ts` |
+| Unit | Ids, fixture replay per recorded version (2.0.20, 2.0.26), fixture integrity, timeline mapping, request mapping and answers, event translation, counters | `packages/engine-opencode/src/ids.test.ts`, `sessions.test.ts`, `timeline.test.ts`, `requests.test.ts`, `events.test.ts` |
 
 **Validation commands** — must be commands that exist in this repository:
 
 ```bash
 bun run check
+bun scripts/diff-openapi.ts packages/engine-opencode/fixtures/2.0.20/openapi.json packages/engine-opencode/fixtures/2.0.26/openapi.json
 ```
 
 ## 26. Risks and Limitations
 
 | Risk ID  | Risk | Impact | Mitigation |
 |----------|------|--------|------------|
-| RISK-001 | Wire event payloads drift between supported versions. | Translation drops a field. | Lenient decode; counters; T-014 version matrix. |
+| RISK-001 | Wire event payloads drift between supported versions. | Translation drops a field. | Lenient decode; counters; the T-014 version matrix replays every recorded version; `scripts/diff-openapi.ts` and the nightly workflow flag removals. |
 | RISK-002 | A pure translator cannot resend a whole part for tool transitions. | Domain patches under-specify. | Resolved by the additive `part.patched`/`item.patched` (DEC-003). |
 | RISK-003 | Non-user/assistant message kinds and several known events are ignored in v0. | Missing timeline entries. | Documented; extend when the UI needs them. |
 | RISK-004 | Reads trust the generated client's decoded types (no runtime validation). | A malformed read throws or maps oddly. | Generated from the engine's own schema; revisit if a read proves flaky. |
@@ -297,6 +308,7 @@ bun run check
 |------|---------|--------|--------|--------------|
 | 2026-10-10 | 0.1.0 | Initial plan. | Planned | T-008 |
 | 2026-10-10 | 0.1.0 | Implemented; all acceptance criteria Current at `44fc431`. | Shipped | T-008 (`44fc431`) |
+| 2026-10-10 | 0.1.1 | Recorded 2.0.20, ran the contract tests once per fixture version, and added the OpenAPI compatibility diff and nightly workflow; verified at `e7726c2`. | Shipped | T-014 (`e7726c2`) |
 
 ## 31. Related Resources
 

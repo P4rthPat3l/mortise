@@ -58,3 +58,9 @@ The sandbox password and any field named like a credential (`apiKey`, `password`
 `authorization`, `client_secret`, access/refresh tokens) are replaced before writing.
 The provider key here is a throwaway string for the scripted local provider, not a real
 credential.
+
+## Normalization
+
+Absolute paths are replaced before writing so a fixture never carries a machine path: the
+sandbox root becomes `<sandbox>`, the repository root `<repo>`, and the home directory
+`<home>`. Ids, timestamps and every other value are kept exactly as recorded.

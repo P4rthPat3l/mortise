@@ -1,7 +1,7 @@
 {
   "data": [
     {
-      "id": "ses_ed9eb15bcffetgood7Gtp6WZN1",
+      "id": "ses_ed9c42724ffeM1fSAUCEPrLXbs",
       "projectID": "f901891a2ac2abc6a81ebae2b032586da6c88ced",
       "cost": 0,
       "tokens": {
@@ -14,17 +14,17 @@
         }
       },
       "time": {
-        "created": 1791640267352,
-        "updated": 1791640267352
+        "created": 1791642818799,
+        "updated": 1791642818799
       },
-      "subpath": ".sandbox/sandbox-erFVvh/work",
+      "subpath": ".sandbox/sandbox-hu2NVV/work",
       "location": {
-        "directory": "/home/parth/Production/mortise-t007/.sandbox/sandbox-erFVvh/work"
+        "directory": "<sandbox>/work"
       }
     }
   ],
   "cursor": {
-    "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZWQ5ZWIxNWJjZmZldGdvb2Q3R3RwNldaTjEiLCJ0aW1lIjoxNzkxNjQwMjY3MzUyLCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
-    "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZWQ5ZWIxNWJjZmZldGdvb2Q3R3RwNldaTjEiLCJ0aW1lIjoxNzkxNjQwMjY3MzUyLCJkaXJlY3Rpb24iOiJuZXh0In19"
+    "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZWQ5YzQyNzI0ZmZlTTFmU0FVQ0VQckxYYnMiLCJ0aW1lIjoxNzkxNjQyODE4Nzk5LCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+    "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZWQ5YzQyNzI0ZmZlTTFmU0FVQ0VQckxYYnMiLCJ0aW1lIjoxNzkxNjQyODE4Nzk5LCJkaXJlY3Rpb24iOiJuZXh0In19"
   }
 }
