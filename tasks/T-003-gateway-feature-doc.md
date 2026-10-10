@@ -2,12 +2,12 @@
 id: T-003
 title: FEAT-001 engine gateway feature document
 phase: 0
-status: ready
+status: review
 tier: sonnet
 depends_on: []
 covers: [P1, P2, P3]
-assignee: null
-started: null
+assignee: deepseek-v4.1-flash
+started: 2026-10-10
 ---
 
 # T-003 FEAT-001 engine gateway feature document
@@ -40,11 +40,11 @@ Create `docs/features/FEAT-001-engine-gateway.md` from the full template and add
 Code. Isolated-engine mode and remote pairing beyond a short "later" note.
 
 ## Acceptance criteria
-- [ ] AC-1: The skill's quality gate (`checklists/quality-gate.md`) blocking checks pass. Record the results in Result.
-- [ ] AC-2: Every claim is labeled `Planned`, `Inferred` or `Unknown`. Nothing is labeled `Current`, since no code exists.
-- [ ] AC-3: Every business rule, acceptance criterion and security rule has a stable ID that T-004 to T-006 can cite.
-- [ ] AC-4: Every OpenCode behavior the document relies on links to `docs/opencode/engine-contract.md` or to an upstream file at v2.0.25.
-- [ ] AC-5: The index row exists.
+- [x] AC-1: The skill's quality gate (`checklists/quality-gate.md`) blocking checks pass. Record the results in Result.
+- [x] AC-2: Every claim is labeled `Planned`, `Inferred` or `Unknown`. Nothing is labeled `Current`, since no code exists.
+- [x] AC-3: Every business rule, acceptance criterion and security rule has a stable ID that T-004 to T-006 can cite.
+- [x] AC-4: Every OpenCode behavior the document relies on links to `docs/opencode/engine-contract.md` or to an upstream file at v2.0.25.
+- [x] AC-5: The index row exists.
 
 ## Verification
 ```bash
@@ -62,4 +62,47 @@ Then confirm by reading that no table `Status` cell and no inline claim uses the
 - A rule would require changing an ADR.
 
 ## Result
-_Filled in by the agent._
+
+### What changed
+
+- Created `docs/features/FEAT-001-engine-gateway.md`, a Mode A (pre-implementation) full-template feature document for the engine gateway.
+- Added the FEAT-001 row to `docs/features/_index.md` and removed the "no feature documents exist yet" note.
+
+### Document contents
+
+- Connection state machine (`stateDiagram-v2`) with all 16 transitions and triggers, matching overview 6.6, plus a state table.
+- Business rules BR-001 to BR-026 covering discovery and start policy, version/capability detection, the event stream, and forwarding.
+- Acceptance criteria AC-001 to AC-011 and edge cases CASE-001 to CASE-014, each mapped to the task that will implement or test it.
+- Security rules SEC-001 to SEC-006; operational requirements OPS-001 to OPS-006 with only sourced targets.
+- Two sequence diagrams (startup, resync) adapted from overview 6.7, a system context diagram, a control flow diagram and an `erDiagram`.
+- Channel contract referencing the exact `@mortise/rpc-contracts` method and event names from T-002 (`servers.list`, `connection.get`, `engine.fetch`; `connection.changed`, `engine.events`, `engine.resync`).
+- Decisions DEC-001 to DEC-007 (all restating existing ADRs, none changing one) and open questions Q-001 to Q-006.
+- Implementation plan with four phases mapped to T-004, T-005, T-006 and T-009.
+
+Status axes: `status: proposed`, `implementation_status: not_started`, `last_verified_commit: null`. Every claim is `Planned`, `Inferred` (upstream engine facts) or `Unknown`. Nothing is `Current`.
+
+### Verification
+
+- `bun run check` — passed: Biome 42 files clean, typecheck all 10 packages, `check:deps` no violations (21 modules), Vitest no test files (expected).
+- Task Verification step 2 (read): no table `Status` cell and no inline claim uses `Current`. The only occurrences are the frontmatter comment, the status legend that defines the word and marks it unused, and the standard `### Current Limitations` heading.
+
+### Quality gate (AC-1, Tier 1 blocking checks)
+
+- B1 no placeholders — clean.
+- B2 every `Current` path exists — no `Current` claim; the three §11 Existing paths (`packages/gateway-core/src/index.ts`, `packages/rpc-contracts/src/index.ts`, `packages/domain/src/index.ts`) all exist.
+- B3 verification commit — `null`, and no claim is `Current`.
+- B4 drift — not applicable (`last_verified_commit: null`).
+- B5 validation commands real — `check`, `test`, `typecheck`, `check:deps` all exist in `package.json`.
+- B6 rules traceable — every BR, AC and SEC row is explicitly marked `Untested; planned in T-00X`.
+- B7 diagrams — six mermaid blocks (two `flowchart`, two `sequenceDiagram`, one `stateDiagram-v2`, one `erDiagram`), each with the type on its first line and explanatory prose.
+- B8 status vocabulary — frontmatter/implementation axes clean; table `Status` cells use only `Planned`/`Inferred`/`Unknown`.
+- B9 discoverable — index row added and `AGENTS.md` points at `docs/features/`.
+
+### Left undone / follow-ups
+
+- Open questions Q-001 to Q-006 need maintainer answers; Q-001 (who owns `hydrating` → `live`) is the only one that could affect T-004's interface, the rest are local.
+- Doc remains `proposed`; only the maintainer moves it to `approved`.
+
+### Commit
+
+`docs(gateway): add FEAT-001 engine gateway feature document`

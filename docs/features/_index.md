@@ -6,8 +6,9 @@ Use this index to find the one feature document relevant to a task. Do not load 
 
 | Feature | Document | Search terms | Primary entry point |
 | ------- | -------- | ------------ | ------------------- |
+| Engine gateway | [FEAT-001-engine-gateway.md](./FEAT-001-engine-gateway.md) | engine gateway, discovery, connection state machine, event stream, resync, request forwarding, engine.fetch | `packages/gateway-core/src/index.ts` |
 
-No feature documents exist yet. The first ones are created by tasks T-003 (FEAT-001, engine gateway) and T-011 (FEAT-002, module system).
+FEAT-002 (module system) is created by task T-011.
 
 ## Index maintenance
 
