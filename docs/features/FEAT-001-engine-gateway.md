@@ -10,9 +10,9 @@ owner: Mortise maintainers
 created: 2026-10-10
 last_updated: 2026-10-10
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 1d4669d
+last_verified_commit: 0dc10a7
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.1
+version: 0.1.2
 tags:
   - gateway
   - engine
@@ -917,6 +917,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 |------------|---------|-------------------------------|---------|--------------------|
 | 2026-10-10 | 0.1.0   | Initial pre-implementation design | Planned | deepseek-v4.1-flash |
 | 2026-10-10 | 0.1.1   | Mode D sync for T-004: discovery, probe, capabilities, connection machine and gateway are `Current` at `1d4669d`; corrected the stale §11 domain and contracts rows | Current | deepseek-v4.1-flash |
+| 2026-10-10 | 0.1.2   | Cover the probe-failure path: `connection.test.ts` now asserts an unreachable probe and a non-2xx probe both reach `failed`, and that retry recovers (§16) | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 
