@@ -173,7 +173,7 @@ window, not a sequence of screens.
 | Journey                       | Trigger                                              | Expected outcome                                                        |
 |-------------------------------|------------------------------------------------------|-------------------------------------------------------------------------|
 | No engine, CLI installed      | No registration; `opencode` on `PATH`                | The gateway calls `ensure()` with no version; the user's CLI starts the service |
-| No engine, no CLI             | No registration; CLI not found                        | `no_engine`; the client shows install options and rechecks on focus      |
+| No engine, no CLI             | No registration; CLI not found                        | `no-engine`; the client shows install options and rechecks on focus      |
 | Running below the floor       | Registration version `< 2.0.20`                      | Not replaced; `incompatible`; read-only browsing where safe; update guidance |
 | Newer patch, same minor       | Version `> highest tested`, `< 2.1.0`                | Join; report `untested`; keep missing capabilities off                   |
 | Registration replaced         | Another client restarts the service                  | Back to `discovering`; recheck version; join again                       |
@@ -211,7 +211,7 @@ flowchart TD
     B -- "yes, version mismatch" --> V["Compute support state"]
     B -- "no" --> C{"CLI installed and start allowed?"}
     C -- "yes" --> E["ensure() with no version"]
-    C -- "no" --> N["no_engine, show install options"]
+    C -- "no" --> N["no-engine, show install options"]
     E --> D
     V --> D
     D --> F{"First event is server.connected?"}
@@ -228,7 +228,7 @@ flowchart TD
 | Step                    | Status  | Controlling component        | Decision                                        | Failure behavior                                      |
 |-------------------------|---------|------------------------------|-------------------------------------------------|-------------------------------------------------------|
 | Discovery               | Planned | `discovery.ts`               | Whether a ready registration exists             | No registration falls through to start policy         |
-| Start policy            | Planned | `discovery.ts` + `connection.ts` | Start only if allowed and CLI installed     | `no_engine`; no spawn                                 |
+| Start policy            | Planned | `discovery.ts` + `connection.ts` | Start only if allowed and CLI installed     | `no-engine`; no spawn                                 |
 | Support computation     | Planned | `probe.ts` + `capabilities.ts` | Range check and capability set                | `incompatible` or `untested`; never a silent downgrade |
 | Stream admission        | Planned | `events.ts`                  | First event must be `server.connected`          | Reconnect and log an error                            |
 | Forwarding authorization| Planned | `forward.ts`                 | Path allowlist and header rules                 | `forbidden_path`                                      |
@@ -345,9 +345,9 @@ stateDiagram-v2
 
 | State        | Meaning                                             | Allowed transitions             | Side effects                                          |
 |--------------|-----------------------------------------------------|---------------------------------|-------------------------------------------------------|
-| `discovering`| Reading the registration and checking the CLI       | `connecting`, `starting`, `no_engine` | None                                             |
+| `discovering`| Reading the registration and checking the CLI       | `connecting`, `starting`, `no-engine` | None                                             |
 | `starting`   | `ensure()` is spawning the user's CLI               | `connecting`, `failed`          | Emits a start notice with the reason                  |
-| `no_engine`  | No service and start not allowed                    | `discovering` (on focus)        | Shows install guidance; never spawns                  |
+| `no-engine`  | No service and start not allowed                    | `discovering` (on focus)        | Shows install guidance; never spawns                  |
 | `connecting` | Probing `/api/info` and opening the stream          | `unauthorized`, `incompatible`, `hydrating` | None                                      |
 | `unauthorized`| `401`; the password may have rotated               | `connecting` (credentials refreshed) | Re-reads the registration                        |
 | `incompatible`| `/api/info` 404 or version outside the range        | `discovering` (user action)     | Shown with clear actions; may keep read-only browsing |
@@ -491,7 +491,7 @@ that will add its test is named. Rule IDs are stable and are cited by T-004 to T
 | BR-002  | Planned | `ensure()` is never called with a `version` option; the user's CLI starts the service            | `discovery.ts`           | Untested; planned in T-004 (`discovery.test.ts`) |
 | BR-003  | Planned | Never stop, replace or reconfigure a running shared service except with explicit user consent    | `connection.ts`          | Untested; planned in T-004 (`connection.test.ts`) |
 | BR-004  | Planned | Start only when no ready registration exists and the user's `opencode` CLI is found              | `discovery.ts`           | Untested; planned in T-004 (`discovery.test.ts`) |
-| BR-005  | Planned | No service and no CLI yields `no_engine`; show install options and recheck on window focus       | `connection.ts`          | Untested; planned in T-004 (`connection.test.ts`) |
+| BR-005  | Planned | No service and no CLI yields `no-engine`; show install options and recheck on window focus       | `connection.ts`          | Untested; planned in T-004 (`connection.test.ts`) |
 | BR-006  | Planned | Support is `supported` for `2.0.20`..highest tested, `untested` for newer `2.0.x`, `unsupported` below `2.0.20` or at/after `2.1.0` | `probe.ts` | Untested; planned in T-004 (`probe.test.ts`) |
 | BR-007  | Planned | A running service below the floor is not replaced; offer a consented restart only if the installed CLI is newer | `connection.ts` | Untested; planned in T-004 (`connection.test.ts`) |
 | BR-008  | Planned | A 404 on `GET /api/info` is `incompatible` protocol, not an older version                        | `probe.ts`               | Untested; planned in T-004 (`probe.test.ts`) |
@@ -541,7 +541,7 @@ Test: Untested; planned in T-004 (`packages/gateway-core/src/probe.test.ts`, `ca
 **Given** no registration and an installed `opencode` CLI
 **When** the gateway decides to start
 **Then** it calls `ensure()` with no `version` option and the user's CLI command
-**And** when no CLI is found it enters `no_engine` and spawns nothing
+**And** when no CLI is found it enters `no-engine` and spawns nothing
 
 Test: Untested; planned in T-004 (`discovery.test.ts`, `connection.test.ts`).
 
@@ -623,7 +623,7 @@ Test: Untested; planned in T-009 (build assertion over `apps/desktop/out/`).
 | CASE-007 | Password rotated; next request returns `401`        | Re-read registration; recover if the password changed            | Unit                 |
 | CASE-008 | Version `2.0.19` running                            | `incompatible`; not replaced; update guidance offered            | Unit                 |
 | CASE-009 | Version `2.1.0` running                             | `unsupported`; not joined as supported; clear actions            | Unit                 |
-| CASE-010 | No CLI installed                                    | `no_engine`; no spawn; install options shown                     | Unit                 |
+| CASE-010 | No CLI installed                                    | `no-engine`; no spawn; install options shown                     | Unit                 |
 | CASE-011 | Path `/auth/connect/x` or `../api`                  | Rejected with `forbidden_path`; never forwarded                  | Unit                 |
 | CASE-012 | Binary response body                                | Base64 round-trips to the original bytes                         | Unit                 |
 | CASE-013 | Two windows close while stream is live              | Upstream stays open while one subscriber remains; closes with none | Unit              |
@@ -856,7 +856,7 @@ own readers. They do not change any ADR. A decision that would change one must s
 | Q-003 | Is offering a consented restart in Phase 0 scope, or deferred to a later phase?             | Mortise maintainers | T-004     | Open   |
 | Q-004 | Confirm the batching default: 16 ms (T-005) versus upstream 10 ms and OpenChamber 50 ms.    | Mortise maintainers | T-005     | Open   |
 | Q-005 | When no compatible service runs but the installed CLI is below the floor, which read-only features remain? | Mortise maintainers | T-004 | Open   |
-| Q-006 | Should the gateway surface `no_engine` rechecks only on window focus, or also on a timer?   | Mortise maintainers | T-004     | Open   |
+| Q-006 | Should the gateway surface `no-engine` rechecks only on window focus, or also on a timer?   | Mortise maintainers | T-004     | Open   |
 
 ## 29. AI Agent Instructions
 

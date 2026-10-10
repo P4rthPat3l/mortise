@@ -81,6 +81,10 @@ Then confirm by reading that no table `Status` cell and no inline claim uses the
 
 Status axes: `status: proposed`, `implementation_status: not_started`, `last_verified_commit: null`. Every claim is `Planned`, `Inferred` (upstream engine facts) or `Unknown`. Nothing is `Current`.
 
+### Consistency fix after T-001 merged
+
+T-001 landed `packages/domain/src/connection.ts`, which names the state phase `"no-engine"` (hyphen). The document had used `no_engine` (underscore) in nine places; all nine now read `no-engine` to match the domain contract T-004 implements against. The mermaid state node `NoEngine` (PascalCase, from overview 6.6) is unchanged.
+
 ### Verification
 
 - `bun run check` — passed: Biome 42 files clean, typecheck all 10 packages, `check:deps` no violations (21 modules), Vitest no test files (expected).
@@ -106,3 +110,4 @@ Status axes: `status: proposed`, `implementation_status: not_started`, `last_ver
 ### Commit
 
 `docs(gateway): add FEAT-001 engine gateway feature document`
+`docs(gateway): align connection phase name with the domain contract`
