@@ -5,14 +5,14 @@ title: Engine gateway
 # status: proposed | approved | active | superseded | retired
 status: proposed
 # implementation_status: not_started | in_progress | shipped_unverified | shipped_verified | sunsetting
-implementation_status: not_started
+implementation_status: in_progress
 owner: Mortise maintainers
 created: 2026-10-10
 last_updated: 2026-10-10
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: null
+last_verified_commit: 0dc10a7
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.0
+version: 0.1.2
 tags:
   - gateway
   - engine
@@ -32,7 +32,7 @@ related_features: []
 | Field                 | Details                                                                                             |
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                             |
-| Implementation status | Not started                                                                                          |
+| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine) implemented          |
 | Owner                 | Mortise maintainers                                                                                  |
 | Primary actors        | User, renderer window, gateway (main process), OpenCode service, other clients (official app, TUI)   |
 | Trigger               | Application start; a window opening; a connection state change; a renderer request or subscription   |
@@ -41,7 +41,7 @@ related_features: []
 | Data stores           | Engine server list in client SQLite; engine password in main memory now, OS keychain later           |
 | External systems      | OpenCode v2 engine (`opencode serve --service`), registration file via `@opencode/client/service`    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | Not yet verified — no code exists                                                                    |
+| Last verified         | T-004 code read at `1d4669d`; the rest (§11 Planned rows, §24 phases 2–4) has no code yet            |
 
 ### At a Glance
 
@@ -53,8 +53,9 @@ marking each reconnect with a resync. Renderer code sends requests as `engine.fe
 gateway adds Basic auth and forwards them, so the password never leaves the main process.
 
 **Sections 1–23 and 30 describe planned behaviour. Section 24 is the phased implementation plan and
-maps to tasks T-004, T-005, T-006 and T-009. No Mortise code exists yet, so nothing is labeled
-`Current`.**
+maps to tasks T-004, T-005, T-006 and T-009. Phase 1 (T-004: discovery, probe, capabilities and the
+connection state machine) is implemented at `1d4669d`; the rows it owns are labeled `Current`. Event
+streaming, forwarding and the desktop host have no code yet, so nothing else is `Current`.**
 
 ### Status Legend
 
@@ -347,7 +348,7 @@ stateDiagram-v2
 |--------------|-----------------------------------------------------|---------------------------------|-------------------------------------------------------|
 | `discovering`| Reading the registration and checking the CLI       | `connecting`, `starting`, `no-engine` | None                                             |
 | `starting`   | `ensure()` is spawning the user's CLI               | `connecting`, `failed`          | Emits a start notice with the reason                  |
-| `no-engine`  | No service and start not allowed                    | `discovering` (on focus)        | Shows install guidance; never spawns                  |
+| `no-engine`  | No service and start not allowed                    | `discovering` (on focus, Retry or the 30 s timer) | Shows install guidance; never spawns                  |
 | `connecting` | Probing `/api/info` and opening the stream          | `unauthorized`, `incompatible`, `hydrating` | None                                      |
 | `unauthorized`| `401`; the password may have rotated               | `connecting` (credentials refreshed) | Re-reads the registration                        |
 | `incompatible`| `/api/info` 404 or version outside the range        | `discovering` (user action)     | Shown with clear actions; may keep read-only browsing |
@@ -356,36 +357,37 @@ stateDiagram-v2
 | `live`       | Stream connected and snapshots loaded               | `resyncing`                     | Batched `engine.events` fan out                       |
 | `resyncing`  | Stream ended, stalled or overflowed                 | `hydrating`, `discovering`      | Marks cached reads stale; backoff reconnect           |
 
-The exact trigger for `hydrating` → `live` ("snapshots loaded") crosses the gateway/window boundary:
-the gateway does not interpret events or read snapshots. See Q-001 in §28.
+The gateway never emits `hydrating`: per Q-001 in §28, the gateway goes `connecting → live` once
+`/api/info` succeeds and the event stream delivers `server.connected`, and `resyncing → live` after a
+reconnect. `hydrating` is a per-window phase the workbench composition root (T-012) shows from the
+moment it sees `live` or `engine.resync` until its snapshots load. `connection.ts` implements every
+other transition at `1d4669d`; the event stream (T-005) reports in through `onStreamConnected` and
+`onStreamLost`.
 
 ## 11. Implementation Map
 
 ### Existing Artifacts
 
-None. `packages/gateway-core/src/index.ts` exists as an empty placeholder (`export {}`).
+Everything below was read at `1d4669d`, the T-004 implementation commit.
 
-| Layer     | Responsibility                        | Repository path                     | Main symbol | Verified |
-|-----------|---------------------------------------|-------------------------------------|-------------|----------|
-| Gateway   | Empty package entry placeholder       | `packages/gateway-core/src/index.ts` | —          | Yes      |
-| Contracts | Empty package entry placeholder       | `packages/rpc-contracts/src/index.ts` | —         | Yes      |
-| Domain    | Empty package entry placeholder       | `packages/domain/src/index.ts`      | —           | Yes      |
+| Layer        | Responsibility                              | Repository path                             | Main symbol                                                        | Verified  |
+|--------------|---------------------------------------------|---------------------------------------------|--------------------------------------------------------------------|-----------|
+| Domain       | Client-owned model the gateway consumes     | `packages/domain/src/`                      | `ServerRef`, `ConnectionState`, `EngineInfo`, `EngineCapabilities` | `1d4669d` |
+| Contracts    | Channel methods and events                  | `packages/rpc-contracts/src/`               | `methods`, `events`, `connectionStateSchema`                       | `1d4669d` |
+| Discovery    | Wrap `discover`/`ensure`; start policy      | `packages/gateway-core/src/discovery.ts`    | `createDiscovery`, `openCodeServiceClient`, `defaultFindCli`       | `1d4669d` |
+| Probe        | `/api/info` probe and support state         | `packages/gateway-core/src/probe.ts`        | `probeInfo`, `supportState`                                        | `1d4669d` |
+| Capabilities | Capability derivation, cached per version   | `packages/gateway-core/src/capabilities.ts` | `deriveCapabilities`, `createCapabilityCache`                      | `1d4669d` |
+| Connection   | Connection state machine                    | `packages/gateway-core/src/connection.ts`   | `createConnection`, `systemClock`                                  | `1d4669d` |
+| Gateway      | Composition: servers, connection, internals | `packages/gateway-core/src/gateway.ts`      | `createGateway`                                                    | `1d4669d` |
+| Logging      | Secret-free logger with the prohibited rule | `packages/gateway-core/src/logging.ts`      | `createLogger`, `redactFields`                                     | `1d4669d` |
+| Entry        | Public entry; JSDoc'd exports               | `packages/gateway-core/src/index.ts`        | —                                                                  | `1d4669d` |
 
 ### Planned Artifacts
 
 | Layer     | Responsibility                              | Planned path                                    | Main symbol              | Change type | Task  |
 |-----------|---------------------------------------------|-------------------------------------------------|--------------------------|-------------|-------|
-| Gateway   | Wrap `discover`/`ensure`; start policy       | `packages/gateway-core/src/discovery.ts`        | `createDiscovery`        | Create      | T-004 |
-| Gateway   | `/api/info` probe and support state          | `packages/gateway-core/src/probe.ts`            | `probeInfo`              | Create      | T-004 |
-| Gateway   | Capability derivation, cached per version    | `packages/gateway-core/src/capabilities.ts`     | `deriveCapabilities`     | Create      | T-004 |
-| Gateway   | Connection state machine                     | `packages/gateway-core/src/connection.ts`       | `createConnection`       | Create      | T-004 |
-| Gateway   | Composition: servers, connection, handlers   | `packages/gateway-core/src/gateway.ts`          | `createGateway`          | Create      | T-004 |
 | Gateway   | SSE parse, watchdog, backoff, batching, fan-out | `packages/gateway-core/src/events.ts`        | `createEventStream`      | Create      | T-005 |
 | Gateway   | `engine.fetch` forwarding with auth          | `packages/gateway-core/src/forward.ts`          | `createForwardHandler`   | Create      | T-006 |
-| Gateway   | Public entry; JSDoc'd exports                | `packages/gateway-core/src/index.ts`            | —                        | Change      | T-004 |
-| Domain    | `ServerRef`, `ConnectionState`, `EngineInfo`, `EngineCapabilities` | `packages/domain/src/`   | —                        | Create      | T-001 |
-| Contracts | `servers.list`, `connection.get`, `engine.fetch` schemas | `packages/rpc-contracts/src/methods.ts` | —                        | Create      | T-002 |
-| Contracts | `connection.changed`, `engine.events`, `engine.resync` schemas | `packages/rpc-contracts/src/events.ts` | —                     | Create      | T-002 |
 | Host      | Create the gateway once; wire per-window MessagePort channels | `apps/desktop/src/main/gateway-host.ts` | `createGatewayHost`      | Create      | T-009 |
 | Host      | `Transport` over `MessagePortMain`           | `apps/desktop/src/main/transport.ts`            | `mainTransport`          | Create      | T-009 |
 | Renderer  | `Transport` over the DOM `MessagePort`       | `apps/desktop/src/renderer/transport.ts`        | `rendererTransport`      | Create      | T-009 |
@@ -482,21 +484,22 @@ stored by the gateway (C2, §6.5 of the overview).
 
 ## 14. Business Rules
 
-No test exists yet (`implementation_status: not_started`). Every rule below is **Untested**; the task
-that will add its test is named. Rule IDs are stable and are cited by T-004 to T-006 test names.
+Rules BR-001..BR-010 and BR-018 are implemented and tested at `1d4669d` (T-004). Every other rule
+below is **Untested**; the task that will add its test is named. Rule IDs are stable and are cited
+by test names.
 
 | Rule ID | Status  | Rule                                                                                             | Enforcement point        | Test reference                          |
 |---------|---------|--------------------------------------------------------------------------------------------------|--------------------------|-----------------------------------------|
-| BR-001  | Planned | Join a ready, compatible registration; never call `ensure()` while a registration exists         | `discovery.ts`           | Untested; planned in T-004 (`packages/gateway-core/src/discovery.test.ts`) |
-| BR-002  | Planned | `ensure()` is never called with a `version` option; the user's CLI starts the service            | `discovery.ts`           | Untested; planned in T-004 (`discovery.test.ts`) |
-| BR-003  | Planned | Never stop, replace or reconfigure a running shared service except with explicit user consent    | `connection.ts`          | Untested; planned in T-004 (`connection.test.ts`) |
-| BR-004  | Planned | Start only when no ready registration exists and the user's `opencode` CLI is found              | `discovery.ts`           | Untested; planned in T-004 (`discovery.test.ts`) |
-| BR-005  | Planned | No service and no CLI yields `no-engine`; show install options and recheck on window focus       | `connection.ts`          | Untested; planned in T-004 (`connection.test.ts`) |
-| BR-006  | Planned | Support is `supported` for `2.0.20`..highest tested, `untested` for newer `2.0.x`, `unsupported` below `2.0.20` or at/after `2.1.0` | `probe.ts` | Untested; planned in T-004 (`probe.test.ts`) |
-| BR-007  | Planned | A running service below the floor is not replaced; offer a consented restart only if the installed CLI is newer | `connection.ts` | Untested; planned in T-004 (`connection.test.ts`) |
-| BR-008  | Planned | A 404 on `GET /api/info` is `incompatible` protocol, not an older version                        | `probe.ts`               | Untested; planned in T-004 (`probe.test.ts`) |
-| BR-009  | Planned | Capabilities derive from `/api/info` and `/openapi.json` operation ids, cached per version       | `capabilities.ts`        | Untested; planned in T-004 (`capabilities.test.ts`) |
-| BR-010  | Planned | A replaced registration returns the machine to `discovering` and rechecks the version            | `connection.ts`          | Untested; planned in T-004 (`connection.test.ts`) |
+| BR-001  | Current | Join a ready, compatible registration; never call `ensure()` while a registration exists         | `discovery.ts`           | `discovery.test.ts` (BR-001) |
+| BR-002  | Current | `ensure()` is never called with a `version` option; the user's CLI starts the service            | `discovery.ts`           | `discovery.test.ts` (BR-002) |
+| BR-003  | Current | Never stop, replace or reconfigure a running shared service except with explicit user consent    | `connection.ts`          | `connection.test.ts` (BR-003) |
+| BR-004  | Current | Start only when no ready registration exists and the user's `opencode` CLI is found              | `discovery.ts`           | `discovery.test.ts` (BR-004) |
+| BR-005  | Current | No service and no CLI yields `no-engine`; show install options and recheck on window focus, on Retry and every 30 s | `connection.ts`          | `connection.test.ts` (BR-005, CASE-010) |
+| BR-006  | Current | Support is `supported` for `2.0.20`..highest tested, `untested` for newer `2.0.x`, `unsupported` below `2.0.20` or at/after `2.1.0` | `probe.ts` | `probe.test.ts` (BR-006) |
+| BR-007  | Current | A running service below the floor is not replaced; Phase 0 shows the installed and required versions with no restart offer | `connection.ts` | `connection.test.ts` (BR-007, CASE-008/009) |
+| BR-008  | Current | A 404 on `GET /api/info` is `incompatible` protocol, not an older version                        | `probe.ts`               | `probe.test.ts` (BR-008) |
+| BR-009  | Current | Capabilities derive from `/api/info` and `/openapi.json` operation ids, cached per version       | `capabilities.ts`        | `capabilities.test.ts` (BR-009) |
+| BR-010  | Current | A replaced registration returns the machine to `discovering` and rechecks the version            | `connection.ts`          | `connection.test.ts` (BR-010, CASE-006) |
 | BR-011  | Planned | Exactly one `/api/event` subscription per connected server, shared by all subscribers            | `events.ts`              | Untested; planned in T-005 (`packages/gateway-core/src/events.test.ts`) |
 | BR-012  | Planned | The first stream event must be `server.connected`; anything else is an error that reconnects     | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
 | BR-013  | Planned | Abort and reconnect after 45 s with no bytes; heartbeat comments reset the deadline              | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
@@ -504,7 +507,7 @@ that will add its test is named. Rule IDs are stable and are cited by T-004 to T
 | BR-015  | Planned | Each successful connect increments `generation`; `engine.resync` precedes any event of that generation | `events.ts`         | Untested; planned in T-005 (`events.test.ts`) |
 | BR-016  | Planned | Forward events in batches on a configurable interval; never interpret payloads beyond JSON parse and `type` | `events.ts`    | Untested; planned in T-005 (`events.test.ts`) |
 | BR-017  | Planned | A malformed event is logged without payload contents and skipped; it never kills the stream       | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
-| BR-018  | Planned | The gateway holds no domain state and derives no status; every view is rebuildable from fresh reads | `gateway.ts`           | Untested; planned in T-004 (`gateway.test.ts`) |
+| BR-018  | Current | The gateway holds no domain state and derives no status; every view is rebuildable from fresh reads | `gateway.ts`           | `gateway.test.ts` (BR-018) |
 | BR-019  | Planned | `engine.fetch` allows only `/api/*` and `/openapi.json`; rejects `..`, absolute URLs and `/auth/*` | `forward.ts`            | Untested; planned in T-006 (`packages/gateway-core/src/forward.test.ts`) |
 | BR-020  | Planned | Reject client-supplied `authorization`, `cookie` and `proxy-authorization` headers, case-insensitive | `forward.ts`         | Untested; planned in T-006 (`forward.test.ts`) |
 | BR-021  | Planned | Inject `Authorization: Basic` with username `opencode` and the current password                   | `forward.ts`            | Untested; planned in T-006 (`forward.test.ts`) |
@@ -516,42 +519,48 @@ that will add its test is named. Rule IDs are stable and are cited by T-004 to T
 
 ## 15. Acceptance Criteria and Cases
 
-No test exists yet. Every criterion below is **Untested**; the task that will add its test is named.
+AC-001..AC-004 are implemented and tested at `1d4669d` (T-004). Every other criterion is
+**Untested**; the task that will add its test is named.
 
-### AC-001: Join an existing service — Status: **Planned**
+### AC-001: Join an existing service — Status: **Current**
 
 **Given** a ready, compatible registration
 **When** the gateway starts
 **Then** discovery adopts it and `ensure()` is never called
 **And** the state reaches `connecting` without spawning a process
 
-Test: Untested; planned in T-004 (`packages/gateway-core/src/discovery.test.ts`).
+Test: `discovery.test.ts` (BR-001) and `connection.test.ts` (BR-001, BR-003): the fake service client
+records that `ensure()` is never called on the `found` path, and the machine emits
+`discovering → connecting`.
 
-### AC-002: Version and capability detection — Status: **Planned**
+### AC-002: Version and capability detection — Status: **Current**
 
 **Given** `GET /api/info` answers with a version and capabilities
 **When** the probe runs
 **Then** `2.0.19` is `unsupported`, `2.0.20`..highest tested is `supported`, a newer `2.0.x` is `untested`, and `2.1.0` is `unsupported`
 **And** capabilities are cached per version
 
-Test: Untested; planned in T-004 (`packages/gateway-core/src/probe.test.ts`, `capabilities.test.ts`).
+Test: `probe.test.ts` (BR-006, BR-008) and `capabilities.test.ts` (BR-009). Capabilities are derived
+from the recorded 2.0.20 and 2.0.26 fixtures, and the cache issues one `/openapi.json` read per
+version.
 
-### AC-003: Start policy — Status: **Planned**
+### AC-003: Start policy — Status: **Current**
 
 **Given** no registration and an installed `opencode` CLI
 **When** the gateway decides to start
 **Then** it calls `ensure()` with no `version` option and the user's CLI command
 **And** when no CLI is found it enters `no-engine` and spawns nothing
 
-Test: Untested; planned in T-004 (`discovery.test.ts`, `connection.test.ts`).
+Test: `discovery.test.ts` (BR-002, BR-004) and `connection.test.ts` (BR-005, CASE-010). The captured
+`ensure()` options carry `command: ["opencode", "serve", "--service"]` and no `version` key.
 
-### AC-004: Unauthorized recovery — Status: **Planned**
+### AC-004: Unauthorized recovery — Status: **Current**
 
 **Given** a probe or forwarded request returns `401`
 **When** the password has rotated and the registration was rewritten
 **Then** the state moves to `unauthorized`, the registration is re-read, and the state recovers
 
-Test: Untested; planned in T-004 and T-006 (`connection.test.ts`, `forward.test.ts`).
+Test: `connection.test.ts` (BR-010, CASE-007). The forwarding half (`forward.test.ts`) is T-006.
 
 ### AC-005: Resync on reconnect — Status: **Planned**
 
@@ -651,12 +660,12 @@ never emitted (§17).
 
 | ID      | Requirement                                                                 | Enforcement                                  | Validation                                          |
 |---------|------------------------------------------------------------------------------|----------------------------------------------|-----------------------------------------------------|
-| SEC-001 | The engine password and pairing tokens never cross the channel               | Gateway holds them; channel schemas cannot carry them | Untested; planned in T-004 (`connection.test.ts`) |
-| SEC-002 | No password, auth header, pairing token or body content appears in logs      | Secret-free logger with a prohibited-field rule | Untested; planned in T-004 and T-006 (capturing logger) |
+| SEC-001 | The engine password and pairing tokens never cross the channel               | Gateway holds them; channel schemas cannot carry them | Current: `gateway.test.ts` (AC-5) asserts every public value is password-free while `internal.endpoint()` still carries it |
+| SEC-002 | No password, auth header, pairing token or body content appears in logs      | Secret-free logger with a prohibited-field rule | Current: `connection.test.ts` (SEC-002) with a capturing logger; the forwarding half is T-006 |
 | SEC-003 | The gateway re-validates the path allowlist and header rules                 | `forward.ts`, defense in depth               | Untested; planned in T-006 (`forward.test.ts`)      |
 | SEC-004 | `set-cookie` is stripped from forwarded responses                            | `forward.ts`                                 | Untested; planned in T-006 (`forward.test.ts`)      |
 | SEC-005 | Renderer and preload bundles contain no credential handling                  | Bundle assertion                             | Untested; planned in T-009 (`rg` over `apps/desktop/out/`) |
-| SEC-006 | The gateway never touches the engine database, data directory or CLI-private files | Only `@opencode/client/service` reads the registration file | Untested; planned in T-004 (`bun run check:deps`) |
+| SEC-006 | The gateway never touches the engine database, data directory or CLI-private files | Only `@opencode/client/service` reads the registration file | Current: `bun run check:deps` passes; the registration is read only through `@opencode/client/service` in `discovery.ts` |
 
 Extensions are out of scope for this feature, but the design keeps ADR-0011 true: nothing in the
 channel exposes credentials or lets a caller answer permission requests. The gateway forwards
@@ -680,6 +689,10 @@ Unknown (§28, Q-002).
 
 The logger takes a prohibited-field rule so SEC-002 is testable with a capturing logger rather than
 by inspection.
+
+T-004 implements the connection-state-change and start-decision lines, plus `registration replaced`
+and the probe/start failure lines. `logging.ts` redacts prohibited fields at every depth before a
+sink sees them. The stream, resync, malformed-event and forwarding lines arrive with T-005 and T-006.
 
 ## 20. Testing Strategy
 
@@ -754,19 +767,19 @@ task and a separate file (`gateway-host.ts`).
 
 ## 24. Implementation Plan
 
-This section describes future work. Nothing here exists in the codebase.
+Phases 2–4 describe future work. Phase 1 is implemented at `1d4669d`.
 
-### Phase 1: Discovery and the connection state machine (T-004)
+### Phase 1: Discovery and the connection state machine (T-004) — Status: **Current**
 
 **Objective:** Find the user's service, decide whether to start one, compute the support state, and expose the connection state machine. Covers P1.
 
-**Expected changes:** `discovery.ts`, `probe.ts`, `capabilities.ts`, `connection.ts`, `gateway.ts`, and JSDoc'd exports in `index.ts`.
+**Actual changes:** `packages/gateway-core/src/discovery.ts`, `probe.ts`, `capabilities.ts`, `connection.ts`, `gateway.ts`, `logging.ts`, and JSDoc'd exports in `index.ts`. `logging.ts` was not in the original plan; the prohibited-field logger needed a home.
 
-**Behavior introduced:** BR-001..BR-010; the full state diagram in §10.
+**Behavior introduced:** BR-001..BR-010 and BR-018; every §10 transition except `hydrating`, which the gateway never emits (Q-001).
 
-**Validation:** Unit tests cover every transition with injected fakes; `ensure()` is never called with a version and never when a registration exists; no public value or log line contains the password.
+**Validation:** Unit tests cover every transition with injected fakes; `ensure()` is never called with a version and never when a registration exists; no public value or log line contains the password. `bun run check` passes at `1d4669d`.
 
-**Completion criteria:** AC-001..AC-004 and AC-007 (host-independent part) pass; `bun run check:deps` holds.
+**Completion criteria:** AC-001..AC-004 pass; `bun run check:deps` holds. AC-007's host-independent part (one gateway per server) is deferred to T-005/T-009 because it needs the stream.
 
 **Recovery:** No persistent state; a bad build is a code rollback.
 
@@ -903,6 +916,8 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | Date       | Version | Change                        | Status  | Author             |
 |------------|---------|-------------------------------|---------|--------------------|
 | 2026-10-10 | 0.1.0   | Initial pre-implementation design | Planned | deepseek-v4.1-flash |
+| 2026-10-10 | 0.1.1   | Mode D sync for T-004: discovery, probe, capabilities, connection machine and gateway are `Current` at `1d4669d`; corrected the stale §11 domain and contracts rows | Current | deepseek-v4.1-flash |
+| 2026-10-10 | 0.1.2   | Cover the probe-failure path: `connection.test.ts` now asserts an unreachable probe and a non-2xx probe both reach `failed`, and that retry recovers (§16) | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 

@@ -13,6 +13,7 @@ Finds or starts the user's OpenCode service without ever replacing it, holds eng
 - `@opencode/client` (types only, for server info)
 - `@mortise/domain`
 - `@mortise/rpc-contracts`
+- `zod`
 - Node built-in modules
 
 ## Forbidden imports

@@ -13,7 +13,8 @@
   "dependencies": {
     "@opencode/client": "2.0.26",
     "@mortise/domain": "workspace:*",
-    "@mortise/rpc-contracts": "workspace:*"
+    "@mortise/rpc-contracts": "workspace:*",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "26.6.5"
