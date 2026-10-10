@@ -2,7 +2,7 @@
 id: T-010
 title: "Core: registries, commands, keybindings, settings, store"
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-001]
 covers: [P5]

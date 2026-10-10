@@ -2,7 +2,7 @@
 id: T-011
 title: Module SDK and FEAT-002
 phase: 0
-status: todo
+status: ready
 tier: sonnet
 depends_on: [T-010]
 covers: [P5]
@@ -47,6 +47,7 @@ bun run check
 ```
 
 ## Notes and gotchas
+- Decision: `@mortise/core` (T-010) gets no feature document of its own; it is infrastructure, and its API is documented in `packages/core/README.md`. FEAT-002 should describe how the module system uses the core primitives (disposable scopes, registries, the store) and link to that README rather than restating it.
 - You may add exactly these dev dependencies to `packages/sdk`: `happy-dom` and `@testing-library/react` (latest stable). Set the Vitest environment per file with `// @vitest-environment happy-dom`.
 - Upstream relies on Solid's ownership tree for cleanup. React has none, so lifetimes are explicit scopes.
 

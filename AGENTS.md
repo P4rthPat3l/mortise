@@ -108,7 +108,7 @@ Rules:
 - A feature document never claims `Current` for code you did not read at the recorded commit.
 - Never answer a document's open questions yourself, and never move `status` to `approved`. Add your question to its Open Questions section, set your task to `blocked`, and ask.
 - If code and document disagree, the code is what runs. Report the mismatch in your Result instead of silently picking one.
-- Feature-to-task map: FEAT-001 engine gateway covers T-004, T-005, T-006, T-009 and T-013. FEAT-002 module system is written in T-011 and used by T-012.
+- Feature-to-task map: FEAT-001 engine gateway covers T-002, T-004, T-005, T-006, T-009 and T-013. FEAT-002 module system is written in T-011 and used by T-012. FEAT-003 engine adapter covers T-008, T-012 and T-014.
 
 ## When to stop and ask the maintainer
 

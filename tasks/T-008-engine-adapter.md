@@ -2,7 +2,7 @@
 id: T-008
 title: Engine adapter v0
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-001, T-007]
 covers: [P4]

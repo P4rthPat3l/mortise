@@ -45,6 +45,8 @@ bun run build
 ```
 
 ## Notes and gotchas
+- Fix from the wave 2 review: `packages/engine-opencode/src/events.ts` keeps its diagnostics counters in module-level state (`const counters`), which AGENTS.md forbids in UI code and which would mix counts across servers. Move the counters onto the adapter instance created by `createAdapter`, and drop `resetEventDiagnostics` in favor of creating a fresh adapter in tests.
+- Open items handed over by T-002 and T-008: confirm `engine.fetch`'s `query` type (`Record<string, string | string[]>`) covers the generated client's query shapes, and decide whether `item.patched` and `part.patched` need more fields (for example message finish and cost) once the timeline store exists.
 - Connecting to the user's shared service is allowed (ADR-002). Reading their sessions is fine; never delete or modify existing sessions in tests.
 - A failed fetch must never render as an empty list.
 

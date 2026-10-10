@@ -2,7 +2,7 @@
 id: T-014
 title: Engine version matrix in CI
 phase: 0
-status: todo
+status: ready
 tier: haiku
 depends_on: [T-007, T-008]
 covers: [P7]

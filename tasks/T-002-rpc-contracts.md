@@ -2,7 +2,7 @@
 id: T-002
 title: RPC contracts and Channel v0
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-001]
 covers: [P3]
