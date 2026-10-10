@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+# Local engine sandboxes and recorded scratch data
+.sandbox/
+
+# IDE settings
+.idea/

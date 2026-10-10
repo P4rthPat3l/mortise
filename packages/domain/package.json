@@ -1,0 +1,13 @@
+{
+  "name": "@mortise/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Client-owned domain model shared by every layer.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

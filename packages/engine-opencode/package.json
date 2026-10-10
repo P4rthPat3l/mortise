@@ -1,0 +1,17 @@
+{
+  "name": "@mortise/engine-opencode",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Adapter that maps OpenCode wire formats to the Mortise domain model.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.26",
+    "@mortise/domain": "workspace:*"
+  }
+}

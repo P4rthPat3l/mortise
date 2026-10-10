@@ -1,0 +1,21 @@
+{
+  "name": "@mortise/gateway-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Host-neutral engine gateway: discovery, credentials, event stream and request forwarding.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@opencode/client": "2.0.26",
+    "@mortise/domain": "workspace:*",
+    "@mortise/rpc-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5"
+  }
+}

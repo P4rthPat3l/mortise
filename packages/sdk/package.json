@@ -1,0 +1,24 @@
+{
+  "name": "@mortise/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Internal module SDK for first-party feature modules, with React bindings.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mortise/core": "workspace:*",
+    "@mortise/domain": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "19.3.0"
+  },
+  "devDependencies": {
+    "react": "19.3.0",
+    "@types/react": "19.3.0"
+  }
+}

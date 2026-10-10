@@ -1,0 +1,1552 @@
+<title>OpenCode Client Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Schibsted+Grotesk:wght@600;700;800&display=swap">
+<style>
+/* Layout: a reading desk. Sticky contents rail beside one prose column on wide screens; one column on phones. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eceff4;
+  --fg: #151a24;
+  --fg-muted: #4b5568;
+  --rule: #d8dde6;
+  --accent: #2747c9;
+  --accent-soft: #e7ecfc;
+  --verified: #0d6e53;
+  --verified-soft: #ddf2ea;
+  --inferred: #5a45a8;
+  --inferred-soft: #ece7f9;
+  --assume: #8a5200;
+  --assume-soft: #f9eed9;
+  --open: #a81f53;
+  --open-soft: #f9e3ec;
+  --code-bg: #eef1f6;
+  --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1219; --surface: #151b25; --surface-2: #1b2230; --fg: #e4e8ef; --fg-muted: #9ba5b7; --rule: #2a3241;
+    --accent: #8fa6ff; --accent-soft: #1c2647; --verified: #55c9a1; --verified-soft: #12302a;
+    --inferred: #b8a6f2; --inferred-soft: #251f3d; --assume: #eeb25c; --assume-soft: #382913;
+    --open: #f07ba6; --open-soft: #3b1a28; --code-bg: #121824; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1219; --surface: #151b25; --surface-2: #1b2230; --fg: #e4e8ef; --fg-muted: #9ba5b7; --rule: #2a3241;
+  --accent: #8fa6ff; --accent-soft: #1c2647; --verified: #55c9a1; --verified-soft: #12302a;
+  --inferred: #b8a6f2; --inferred-soft: #251f3d; --assume: #eeb25c; --assume-soft: #382913;
+  --open: #f07ba6; --open-soft: #3b1a28; --code-bg: #121824; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body);
+  font-size: 16px; line-height: 1.62; margin: 0; padding-inline: 16px; padding-block: 0 64px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.layout { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; }
+@media (min-width: 1100px) { .layout { grid-template-columns: 248px minmax(0, 1fr); gap: 56px; } }
+main { min-width: 0; max-width: 900px; }
+
+/* Masthead */
+.masthead { padding-block: 48px 28px; border-bottom: 1px solid var(--rule); margin-bottom: 8px; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); margin: 0 0 14px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 4.6vw, 2.9rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance; max-width: 22ch; }
+.lede { font-size: 1.125rem; color: var(--fg-muted); max-width: 64ch; margin: 0 0 22px; }
+.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 24px; margin: 0; font-size: 0.875rem; }
+.meta div { min-width: 0; }
+.meta dt { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+.meta dd { margin: 2px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 22px; font-size: 0.85rem; color: var(--fg-muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Contents rail */
+nav.toc { padding-top: 24px; }
+@media (min-width: 1100px) { nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; padding-block: 48px 24px; } }
+.toc h2 { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-muted); margin: 0 0 12px; font-weight: 500; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: toc; }
+.toc li a { display: grid; grid-template-columns: 2.2em 1fr; padding: 5px 8px; border-radius: 6px; text-decoration: none; color: var(--fg-muted); font-size: 0.9rem; line-height: 1.35; }
+.toc li a:hover { background: var(--surface-2); color: var(--fg); }
+.toc li a.active { background: var(--accent-soft); color: var(--fg); }
+.toc li a span:first-child { font-family: var(--font-mono); font-size: 0.78rem; padding-top: 1px; }
+@media (max-width: 1099px) { nav.toc { border-bottom: 1px solid var(--rule); padding-bottom: 20px; } .toc ol { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); } }
+
+/* Sections and type scale: 0.8125 / 0.875 / 1 / 1.125 / 1.375 / 1.75 / 2.9 */
+section { padding-top: 40px; scroll-margin-top: 16px; }
+h2.sec { font-family: var(--font-display); font-weight: 700; font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 16px; text-wrap: balance; display: flex; gap: 14px; align-items: baseline; }
+h2.sec .num { font-family: var(--font-mono); font-weight: 500; font-size: 0.95rem; color: var(--accent); letter-spacing: 0; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.375rem; line-height: 1.25; margin: 36px 0 10px; text-wrap: balance; }
+h4 { font-family: var(--font-display); font-weight: 600; font-size: 1.125rem; margin: 26px 0 8px; }
+p, ul, ol { max-width: 70ch; }
+p { margin: 0 0 14px; }
+ul, ol { padding-left: 1.3em; margin: 0 0 16px; }
+li { margin: 0 0 7px; }
+li::marker { color: var(--fg-muted); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.55; background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 0 0 18px; max-width: 100%; }
+pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.figure { margin: 8px 0 22px; }
+.figure pre.mermaid { background: var(--surface); text-align: center; padding: 18px 12px; }
+.figure figcaption, .caption { font-size: 0.8125rem; color: var(--fg-muted); margin-top: 6px; max-width: 70ch; }
+
+/* Evidence tags */
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; vertical-align: 2px; white-space: nowrap; margin-right: 4px; }
+.t-ver { background: var(--verified-soft); color: var(--verified); }
+.t-inf { background: var(--inferred-soft); color: var(--inferred); }
+.t-rec { background: var(--accent-soft); color: var(--accent); }
+.t-asm { background: var(--assume-soft); color: var(--assume); }
+.t-open { background: var(--open-soft); color: var(--open); }
+.t-dec { background: var(--surface-2); color: var(--fg); }
+a.src { font-family: var(--font-mono); font-size: 0.78rem; color: var(--fg-muted); text-decoration-color: var(--rule); white-space: normal; overflow-wrap: anywhere; }
+a.src:hover { color: var(--accent); }
+
+/* Notes: a filled surface with a small label, used for implications and key decisions */
+.note { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; margin: 4px 0 22px; max-width: 74ch; }
+.note > p:last-child, .note > ul:last-child { margin-bottom: 0; }
+.note .label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); margin: 0 0 6px; display: block; }
+.note.key { background: var(--accent-soft); border-color: transparent; }
+
+/* Tables */
+.tbl { overflow-x: auto; margin: 6px 0 22px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; line-height: 1.45; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-mono); font-weight: 500; font-size: 0.7rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--fg-muted); background: var(--surface-2); white-space: nowrap; }
+td code { font-size: 0.8em; }
+.num-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wide table { min-width: 860px; }
+.r { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; }
+.r::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.r.good { color: var(--verified); }
+.r.mixed { color: var(--assume); }
+.r.poor { color: var(--open); }
+td .sub { display: block; color: var(--fg-muted); font-size: 0.8rem; margin-top: 2px; }
+
+/* Two-column lists and ADR cards */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 28px; margin: 4px 0 18px; }
+.cols > div { min-width: 0; }
+.cols h4 { margin-top: 0; }
+.adr { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); padding: 16px 18px; margin: 0 0 14px; }
+.adr header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin-bottom: 8px; }
+.adr h4 { margin: 0; font-size: 1.05rem; }
+.adr .id { font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); }
+.adr .status { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-muted); }
+.adr dl { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0; font-size: 0.9rem; }
+@media (min-width: 640px) { .adr dl { grid-template-columns: 116px minmax(0, 1fr); gap: 6px 14px; } }
+.adr dt { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--fg-muted); padding-top: 3px; }
+.adr dd { margin: 0; min-width: 0; }
+details.more { margin: 0 0 18px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+details.more > summary { cursor: pointer; padding: 10px 14px; font-weight: 500; }
+details.more > div { padding: 0 16px 6px; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 32px 0; }
+.foot { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--fg-muted); }
+</style>
+
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#s1"><span>01</span><span>Executive summary</span></a></li>
+    <li><a href="#s2"><span>02</span><span>OpenCode v2.0.25 analysis</span></a></li>
+    <li><a href="#s3"><span>03</span><span>OpenChamber analysis</span></a></li>
+    <li><a href="#s4"><span>04</span><span>Requirements and constraints</span></a></li>
+    <li><a href="#s5"><span>05</span><span>Architecture alternatives</span></a></li>
+    <li><a href="#s6"><span>06</span><span>Recommended architecture</span></a></li>
+    <li><a href="#s7"><span>07</span><span>Extension system proposal</span></a></li>
+    <li><a href="#s8"><span>08</span><span>Compatibility strategy</span></a></li>
+    <li><a href="#s9"><span>09</span><span>Testing and validation</span></a></li>
+    <li><a href="#s10"><span>10</span><span>Risks and open questions</span></a></li>
+    <li><a href="#s11"><span>11</span><span>Implementation roadmap</span></a></li>
+    <li><a href="#s12"><span>12</span><span>Architecture decision records</span></a></li>
+    <li><a href="#s13"><span>13</span><span>Product name and branding</span></a></li>
+    <li><a href="#sources"><span>A</span><span>Sources and method</span></a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="masthead">
+  <p class="eyebrow">Architecture research &middot; 10 October 2026</p>
+  <h1>A modular, extensible desktop client on the OpenCode v2 engine</h1>
+  <p class="lede">This study reads the OpenCode v2.0.25 source and the current OpenChamber source, then recommends how to build an independent desktop client that keeps the engine intact and can grow a community ecosystem of themes, views, commands, integrations and workflows.</p>
+  <dl class="meta">
+    <div><dt>Baseline</dt><dd>OpenCode <code>v2.0.25</code>, tag <code>b44eea9</code>, released 2026-10-08</dd></div>
+    <div><dt>Reference</dt><dd>OpenChamber <code>main</code> at <code>9ed7e7d</code>, 2026-10-10</dd></div>
+    <div><dt>Method</dt><dd>Static source reading, plus OpenAPI diffs across seven v2 tags. Nothing was run against a live engine.</dd></div>
+    <div><dt>Paths</dt><dd>OpenCode paths are relative to <code>packages/</code> at the tag unless they name a root file.</dd></div>
+    <div><dt>Revision</dt><dd>2: your decisions recorded, React chosen, web and mobile path and naming added</dd></div>
+  </dl>
+  <div class="legend" aria-label="Evidence labels">
+    <span><span class="tag t-ver">Verified</span>Read in source at the pinned revision</span>
+    <span><span class="tag t-inf">Inferred</span>Reasoned from source, not executed</span>
+    <span><span class="tag t-rec">Recommendation</span>Proposed design</span>
+    <span><span class="tag t-asm">Assumption</span>Could invalidate the design</span>
+    <span><span class="tag t-open">Open question</span>Needs a decision or more research</span>
+  </div>
+</header>
+
+<!-- ============================== 1 ============================== -->
+<section id="s1">
+<h2 class="sec"><span class="num">01</span>Executive summary</h2>
+
+<div class="note key">
+<span class="label">Recommended direction</span>
+<p>Build a <strong>hybrid architecture, in stages</strong>. An Electron app whose main process runs a thin <strong>engine gateway</strong> for discovery, credentials and the single event stream. A pure <strong>adapter package</strong> is the only code that knows OpenCode wire shapes. A small <strong>application core</strong> of contribution registries, commands, settings and a read-only store sits above it. Every product feature is a <strong>first-party module</strong> built on an internal SDK with lint-enforced boundaries. Third parties get a <strong>separate, smaller, versioned extension API</strong>: declarative packages first, sandboxed iframe extensions second, privileged local services last. Agent-side capabilities such as new tools go into <strong>OpenCode engine plugins</strong>, which talk to their GUI half over OpenCode's own plugin RPC. The UI is <strong>React</strong>. The gateway is written <strong>host-neutral</strong>, so the same code can later run in a server for the web and mobile versions.</p>
+</div>
+
+<h3>Findings that shape the design</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>OpenCode already builds its own app this way.</strong> In v2.0.25, every desktop and web feature that is not the core shell is a built-in GUI extension on a typed SDK (<code>gui-extensions</code>). That SDK is private, landed between v2.0.20 and v2.0.22 (1 to 4 October 2026), and has no sandbox. Its archive installer evaluates bundles as trusted code and is refused in packaged builds "until installs have a trust model". It is a strong design reference and a strategic signal. It is not a platform you can build on today.</li>
+  <li><span class="tag t-ver">Verified</span><strong>The engine is one shared background service per user.</strong> <code>opencode serve --service</code> registers itself in <code>~/.local/state/opencode/service.json</code>. The official desktop asks for its exact bundled version and <em>replaces</em> a running service of any other version. A client that does the same starts a version war with the official app.</li>
+  <li><span class="tag t-ver">Verified</span><strong>The event stream is volatile by contract.</strong> One SSE stream for all projects, no replay, a 4,096-event buffer per subscriber, and overflow kills the stream. The client must be built as snapshot plus deltas with deliberate resync.</li>
+  <li><span class="tag t-ver">Verified</span><strong>The public contract is documented.</strong> <code>V2_HTTP_API_AUDIT.md</code> classifies all 141 operations as keep, change, remove or experimental. That gives you a defensible line between what to depend on and what to wrap behind feature flags.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Churn is real but has settled.</strong> 27 releases in 27 days. v2.0.0 to v2.0.10 renamed every operation and removed endpoints. v2.0.10 to v2.0.26 has been additive. Request bodies reject unknown fields, so a newer client can break against an older engine.</li>
+  <li><span class="tag t-inf">Inferred</span><strong>A second engine process on the same database is unsafe.</strong> Session execution is process-local with restart-recovery claims, and upstream code comments call two services on one database a hazard. "Run my own private engine" is only safe with a separate database, and a separate database means separate session history.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Whoever holds the engine credential can approve agent actions.</strong> The official app's auto-approve is a client-side setting. Extensions must never see the credential or answer permission requests, and "send a prompt" has to be treated as a high-risk capability.</li>
+  <li><span class="tag t-ver">Verified</span><strong>OpenChamber shows both what works and what to avoid.</strong> It has a clean wire-translation layer, a compatibility gate and capability-gated sandboxed extensions. It also reads CLI-private files and writes a row into OpenCode's SQLite database to re-arm a migration, and its core features are not built on its own extension SDK.</li>
+</ul>
+
+<div class="cols">
+<div>
+<h4>Build first</h4>
+<ul>
+  <li>Engine gateway with join-never-replace policy and resync, written host-neutral so a server can run it later</li>
+  <li>Adapter package and client-owned domain model</li>
+  <li>Core registries: commands, keybindings, menus, panels, settings, themes</li>
+  <li>Internal module manifest, contracts and lint boundaries</li>
+  <li>Declarative theme format and design tokens</li>
+  <li>Compatibility CI across two engine versions</li>
+</ul>
+</div>
+<div>
+<h4>Defer until there is demand</h4>
+<ul>
+  <li>Third-party code runtime (until the core contribution model has stabilized)</li>
+  <li>Marketplace, signing and publisher verification</li>
+  <li>Privileged local services for extensions</li>
+  <li>Extensions rendering inside the timeline</li>
+  <li>Web and mobile, until the desktop works (section <a href="#s6-web">6.10</a>)</li>
+  <li>Any engine abstraction beyond OpenCode</li>
+</ul>
+</div>
+</div>
+
+<h3>Decisions recorded</h3>
+<ul>
+  <li><span class="tag t-dec">Decided</span><strong>Desktop first.</strong> Web and mobile follow once the desktop works, reusing the same core (6.10).</li>
+  <li><span class="tag t-dec">Decided</span><strong>Users install OpenCode themselves.</strong> No bundled binary, so the client supports a version range (8.6).</li>
+  <li><span class="tag t-dec">Decided</span><strong>React for the UI</strong> (ADR-006, 6.11).</li>
+  <li><span class="tag t-dec">Decided</span><strong>A curated git index you maintain</strong> as the first registry (ADR-013).</li>
+  <li><span class="tag t-dec">Decided</span><strong>Companion engine plugins:</strong> the client shows the config line and checks it was added. It never edits engine config silently (7.12).</li>
+  <li><span class="tag t-dec">Decided</span><strong>Contribute upstream</strong> by opening issues for four engine improvements, without waiting on them (8.8).</li>
+  <li><span class="tag t-rec">Recommendation</span><strong>Product name:</strong> Mortise, with Binnacle as the alternate (section <a href="#s13">13</a>).</li>
+</ul>
+</section>
+
+<!-- ============================== 2 ============================== -->
+<section id="s2">
+<h2 class="sec"><span class="num">02</span>OpenCode v2.0.25 architecture analysis</h2>
+
+<h3>2.1 Baseline and repository topology</h3>
+<p><span class="tag t-ver">Verified</span>v2.0.25 lives on the <code>v2</code> lineage. Your local <code>dev</code> checkout is the v1 line (<code>packages/opencode</code> at 1.18.35). It split from v2 at <code>0e2dd4a</code> on 2026-06-26, and the tag's root <code>AGENTS.md</code> names <code>v2</code> as the default branch. Research against <code>dev</code> would describe the wrong product. Everything below was read from the tag.</p>
+<p><span class="tag t-ver">Verified</span>The tag's root <code>AGENTS.md</code> states the dependency rule: Schema to Core and Protocol, then Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never on Core or Server.</p>
+
+<div class="tbl wide"><table>
+<thead><tr><th>Package</th><th>Role</th><th>npm</th><th>Relevance to your client</th></tr></thead>
+<tbody>
+<tr><td><code>schema</code></td><td>Browser-safe wire and storage contracts</td><td>Published</td><td>Types the adapter decodes</td></tr>
+<tr><td><code>protocol</code></td><td>Effect <code>HttpApi</code> definition and committed <code>openapi.json</code></td><td>Published</td><td>The contract itself</td></tr>
+<tr><td><code>server</code></td><td>Handlers, SSE feed, auth, CORS, PTY sockets</td><td>Published</td><td>Runs inside the engine</td></tr>
+<tr><td><code>core</code></td><td>Sessions, tools, permissions, MCP, VCS, persistence</td><td>Published</td><td>Engine internals; never import</td></tr>
+<tr><td><code>client</code></td><td>Generated Promise and Effect clients, Solid data layer, service discovery</td><td>Published</td><td>Main dependency, adapter and gateway only</td></tr>
+<tr><td><code>sdk</code></td><td>In-process engine host, no listener</td><td>Published</td><td>Hermetic integration tests</td></tr>
+<tr><td><code>plugin</code></td><td>Engine plugin API (Promise, Effect, TUI)</td><td>Published</td><td>Agent-side extensions</td></tr>
+<tr><td><code>plugin-browser</code></td><td>Engine plugin with a desktop counterpart</td><td>Published</td><td>Reference pattern for split extensions</td></tr>
+<tr><td><code>ui</code></td><td>Solid component library and desktop theme engine</td><td>Published</td><td>Optional reuse; theme format worth adopting</td></tr>
+<tr><td><code>theme</code></td><td>Terminal UI themes only</td><td>Published</td><td>Not relevant</td></tr>
+<tr><td><code>cli</code></td><td>The <code>opencode</code> binary: <code>serve --service</code>, <code>pair</code>, ACP</td><td>Published</td><td>The engine you run or join</td></tr>
+<tr><td><code>simulation</code></td><td>Simulated model provider and driving harness</td><td>Published</td><td>Deterministic tests (API to verify)</td></tr>
+<tr><td><code>app</code></td><td>Official Solid web app</td><td>Private</td><td>Reference only</td></tr>
+<tr><td><code>desktop</code></td><td>Official Electron shell</td><td>Private</td><td>Reference only</td></tr>
+<tr><td><code>gui-extensions</code></td><td>Official GUI extension SDK and built-ins</td><td>Private</td><td>Design reference (MIT)</td></tr>
+<tr><td><code>session-ui</code></td><td>Timeline rendering</td><td>Private</td><td>Reimplement</td></tr>
+<tr><td><code>tui</code></td><td>Terminal UI</td><td>Private</td><td>Not relevant</td></tr>
+</tbody></table></div>
+<p class="caption">Publication status from each package's <code>script/publish.ts</code> and the <code>private</code> flag in <code>package.json</code>.</p>
+
+<div class="figure">
+<pre class="mermaid">
+flowchart LR
+  subgraph clients["Clients"]
+    tui["TUI, private"]
+    app["Web app, Solid, private"]
+    desk["Electron desktop, private"]
+    you["Your client"]
+  end
+  subgraph contract["Published contract packages"]
+    client["client: Promise, Effect, Solid data, service discovery"]
+    protocol["protocol: HttpApi and openapi.json"]
+    schema["schema: wire types"]
+  end
+  subgraph engine["opencode serve --service, one per user"]
+    server["server: /api routes, SSE /api/event, PTY sockets"]
+    core["core: sessions, tools, permissions, MCP, VCS"]
+    eplug["engine plugins"]
+    db[("SQLite opencode.db")]
+  end
+  reg["service.json registration"]
+  desk --> client
+  app --> client
+  tui --> client
+  you -.-> client
+  client --> protocol --> schema
+  client -- "HTTP with Basic auth" --> server
+  client -- "discover, ensure, stop" --> reg
+  server --> core --> db
+  core --> eplug
+</pre>
+<figcaption>Verified topology at v2.0.25. The dotted edge is where your client attaches.</figcaption>
+</div>
+
+<h3>2.2 Engine process model</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>One background service per user and release channel.</strong> <code>opencode serve --service</code> writes <code>service.json</code> under <code>$XDG_STATE_HOME/opencode/</code> (falling back to <code>~/.local/state/opencode/</code>) with mode 0600. The file holds instance id, version, URL, pid and a private password. Every 5 seconds the service re-reads the file and shuts itself down if another service has replaced the registration. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/services/service-registration.ts">cli/src/services/service-registration.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Fixed default port.</strong> Stable channels listen on 0xC0DE (49374), so a second contender fails to bind and backs off. Other channels hash to their own port and registration file. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/services/service-config.ts">cli/src/services/service-config.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Discovery API.</strong> <code>@opencode/client/service</code> exports <code>discover()</code> (find a ready, compatible service without starting one), <code>ensure()</code> (start <code>opencode serve --service</code> if missing) and <code>stop()</code> (with optional terminal handoff). Its comment calls the registration file "the complete discovery contract". <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/promise/service.ts">client/src/promise/service.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Version replacement.</strong> <code>ensure({ version })</code> takes an exact string or a predicate. If the running service fails it, <code>decide()</code> returns <code>replace</code>, and ensure stops that service and starts its own. A 404 on <code>GET /api/info</code> marks a service incompatible rather than older. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/service-probe.ts">client/src/service-probe.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>The official desktop pins.</strong> On first connect it passes its bundled CLI version, so it replaces any other running version. Reconnects pass no version and adopt whatever is running. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/service/background-service.ts">desktop/src/main/service/background-service.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Persistence.</strong> The engine database is <code>&lt;data dir&gt;/opencode.db</code>. Other channels get a channel-specific name, and <code>OPENCODE_DB</code> overrides it. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/database-path.ts">cli/src/database-path.ts</a></li>
+  <li><span class="tag t-inf">Inferred</span><strong>Two engine processes must not share a database.</strong> The desktop explains its fixed port by saying that with port 0 "two services could boot against the same database". The root <code>AGENTS.md</code> describes session execution as process-local, with write-ahead execution claims that a restarted process resumes. Two processes on one database could each drain or resume the same session. Not tested.</li>
+</ul>
+<div class="note">
+<span class="label">Implication</span>
+<p><span class="tag t-rec">Recommendation</span>Join the user's service by default and never replace it unasked. If you need isolation, run a private engine with its own <code>OPENCODE_DB</code> and accept separate history. Section <a href="#s8">8</a> turns this into a connection policy.</p>
+</div>
+
+<h3>2.3 Client protocol</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>HTTP and JSON under <code>/api</code>.</strong> The API is defined as an Effect <code>HttpApi</code> in <code>protocol</code>, served live at <code>/openapi.json</code> (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/routes.ts">server/src/routes.ts</a>), and committed as <code>protocol/openapi.json</code> with 141 operations. The document's own <code>info</code> block says version <code>0.0.1</code>, "Experimental HttpApi surface".</li>
+  <li><span class="tag t-ver">Verified</span><strong>Authentication.</strong> HTTP Basic with username <code>opencode</code> and the service password. Pairing works like this: <code>POST /api/pair</code> issues a short-lived single-use code, and <code>/auth/connect/:code</code> exchanges it for a session token. The token is HMAC-signed with a key derived from the password, lives 30 days, and is revoked when the password rotates. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/auth.ts">server/src/auth.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>CORS allowlist.</strong> <code>http://localhost:*</code>, <code>http://127.0.0.1:*</code>, <code>oc://renderer</code>, Tauri origins, <code>https://*.opencode.ai</code>, plus a <code>cors</code> list from service config. Requests with no Origin header pass. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/cors.ts">server/src/cors.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Location scoping.</strong> Most routes take <code>location[directory]</code>. One server serves many directories and initializes each lazily on first use. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/location.ts">server/src/location.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Terminals.</strong> A WebSocket at <code>/api/pty/{id}/connect</code>, gated by a one-time connect token. The generic HTTP client does not cover it.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Strict request bodies.</strong> Bodies such as <code>session.prompt</code> declare <code>additionalProperties: false</code>, so an older engine rejects any field it does not know.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Typed errors per endpoint</strong>, for example <code>SessionNotFoundError</code> and <code>InvalidCursorError</code>. The audit replaced many nullable responses with typed 404s. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/protocol/src/errors.ts">protocol/src/errors.ts</a></li>
+</ul>
+<div class="note">
+<span class="label">Implication</span>
+<p><span class="tag t-inf">Inferred</span>An Electron renderer on a custom scheme such as <code>app://</code> will be refused unless the user's shared service config lists it. Adding it would mean editing someone else's config. Route engine traffic through the main process, which sends no Origin header and keeps the password out of the renderer. Do not reuse <code>oc://renderer</code>, which belongs to the official app.</p>
+</div>
+
+<h3>2.4 Events and streaming</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>One stream for everything.</strong> <code>GET /api/event</code> is SSE across all locations. The first event is <code>server.connected</code>, and a heartbeat comment arrives every 15 seconds (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/handlers/event.ts">server/src/handlers/event.ts</a>). Each subscriber gets a dropping queue of 4,096 encoded events, and overflow fails that subscriber (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/event-feed.ts">server/src/event-feed.ts</a>). The protocol describes the stream as "Volatile by contract: a slow consumer overflows and fails the stream, and events during disconnection are missed." It sends no <code>id:</code> lines and has no <code>Last-Event-ID</code> replay. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/protocol/src/groups/event.ts">protocol/src/groups/event.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Envelope.</strong> Each event has <code>id</code> (<code>evt_…</code>), <code>type</code>, <code>created</code>, <code>data</code>, and optionally <code>location</code> and <code>metadata</code>. Durable events add <code>durable: { aggregateID, seq, version }</code>. Ephemeral events, which include all streaming deltas, do not. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/event.ts">schema/src/event.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Public inventory.</strong> <code>EventManifest.ServerDefinitions</code> lists the events that may appear on the public stream: session lifecycle, inbox, execution, steps, text and reasoning deltas, tool input, calls, progress, success and failure, retry, compaction, revert, permissions, forms, terminals, shells, MCP, VCS, and plugin RPC events named <code>rpc.*</code>. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/event-manifest.ts">schema/src/event-manifest.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>The reference client's recovery.</strong> 2 s connect timeout, 45 s idle watchdog, 1 s reconnect delay, events applied in 10 ms batches, and a forced resync on the <code>online</code> event or when the page returns after 20 s of quiet (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/solid/connection.ts">client/src/solid/connection.ts</a>). On every <code>server.connected</code> it refetches active sessions, location, VCS and projects, and revalidates cached reads one at a time so an older response cannot overwrite a newer one (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/solid/data.ts">client/src/solid/data.ts</a>).</li>
+  <li><span class="tag t-ver">Verified</span><strong>No session status event.</strong> Running and idle are derived from <code>session.execution.*</code> plus the <code>GET /api/session/active</code> snapshot.</li>
+</ul>
+
+<h3>2.5 Sessions, execution and concurrency</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>Admission is separate from execution.</strong> <code>session.prompt</code> durably enqueues an inbox item, then wakes the runner. <code>resume: false</code> admits without running. Delivery is <code>steer</code> (default, delivered at the next step boundary) or <code>queue</code> (delivered when the session would go idle). Pending items can be cancelled or switched between modes. (Root <code>AGENTS.md</code>, V2 Session Core; audit groups 5 and 7.)</li>
+  <li><span class="tag t-ver">Verified</span><strong>Idempotent retries.</strong> The prompt body accepts an <code>id</code> matching <code>^msg_</code>. Reusing an id for the same session and type returns the first admission, so a client can retry safely with ids it generates itself.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Concurrency and recovery.</strong> Different sessions run concurrently. Resumes of the same session join one run. <code>session.interrupt</code> stops the active run. After a restart the engine resumes sessions that still hold an execution claim.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Other operations</strong> include fork (optionally before a message), staged revert with commit or clear, compact, shell, command, synthetic input, move, background, switch agent or model, diff, context, and one-off generation.</li>
+</ul>
+
+<h3>2.6 Permissions, forms, configuration and credentials</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>Permissions.</strong> Pending requests are listed per session or globally. A reply carries <code>decision: "once" | "always" | "reject"</code>. Saved permissions can be listed and removed, and session rules change through <code>session.update</code>.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Approval is a client power.</strong> The official app's auto-approve is a client-local setting that answers every <code>permission.asked</code> on a connection, and it sweeps pending requests on reconnect because the stream does not replay them. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/app/src/session/requests/auto-approve.ts">app/src/session/requests/auto-approve.ts</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Forms</strong> are questions the engine asks the user, with typed answers, reply and cancel.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Configuration</strong> is readable (<code>GET /api/config</code> returns documents and directories) but not writable through the stable API. The only write route is experimental and accepts only <code>shell</code>.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Credentials and integrations</strong> support list, create, update, remove, activate, OAuth and command-based connection flows.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Engine plugins</strong> can be listed, checked and updated, but there is no install endpoint. They are declared in the <code>plugins</code> config key as a package name plus options. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/config/plugin.ts">schema/src/config/plugin.ts</a></li>
+</ul>
+
+<h3>2.7 What is public and what is internal</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Surface</th><th>Status</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>Endpoints marked <em>Keep</em> or <em>Change</em> in the audit: session, message, inbox, permission, form, fs, vcs, worktree, pty, shell, event, rpc, info</td><td><span class="r good">Intended public contract</span></td><td><a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/V2_HTTP_API_AUDIT.md">V2_HTTP_API_AUDIT.md</a></td></tr>
+<tr><td><code>/api/experimental/*</code>: session stats, import, export, wait, log; persistent terminals; runtime MCP overrides; instruction entries; config update; stateless generation; v1 migration status</td><td><span class="r mixed">Outside stable commitment</span></td><td>Audit, "Experimental-only"</td></tr>
+<tr><td>Workspace routes, config preferences, <code>project.current</code>, plugin await-activation, health and server (merged into <code>info</code>)</td><td><span class="r poor">Removed</span></td><td>Audit; v2.0.0 to v2.0.10 diff</td></tr>
+<tr><td>Labels: OpenAPI <code>info</code> says "Experimental HttpApi surface"; the event group says "Experimental event stream routes"</td><td><span class="r mixed">Inconsistent with the audit</span></td><td><code>protocol/openapi.json</code>, <code>protocol/src/groups/event.ts</code></td></tr>
+<tr><td><code>@opencode/client</code> Promise root</td><td><span class="r mixed">Published, versioned with the engine</span></td><td>Its README calls it a "Private generation target", yet it ships to npm</td></tr>
+<tr><td><code>@opencode/client/solid</code> data layer</td><td><span class="r mixed">Published, shaped by the official app</span></td><td>Changed between v2.0.20 and v2.0.25</td></tr>
+<tr><td>Registration file and <code>@opencode/client/service</code></td><td><span class="r good">Discovery contract</span></td><td>Comment in <code>client/src/promise/service.ts</code></td></tr>
+<tr><td><code>gui-extensions</code> SDK, desktop IPC, app internals</td><td><span class="r poor">Private</span></td><td><code>"private": true</code></td></tr>
+<tr><td>Engine database, CLI-private files, data-directory layout</td><td><span class="r poor">Internal, no contract</span></td><td>Not exposed by any route or package</td></tr>
+</tbody></table></div>
+
+<h3>2.8 Extension points that already exist</h3>
+<h4>Engine plugins</h4>
+<p><span class="tag t-ver">Verified</span><code>@opencode/plugin</code> plugins run in-process inside the engine. They register transform hooks for agents, commands, integrations, MCP, models, providers, references, skills, tools, VCS and web search, plus runtime hooks for the AI SDK, session context just before dispatch, and retry decisions. They can add executable tools with schema-typed input and output. Plugins share the host's <code>effect</code> instance and run with full engine privileges. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/plugin/src/README.md">plugin/src/README.md</a></p>
+<h4>Plugin RPC: the official bridge between a plugin and a client</h4>
+<p><span class="tag t-ver">Verified</span>A plugin defines methods and events with portable schemas (Standard Schema or JSON Schema). Clients call <code>POST /api/rpc/{rpcID}/{method}</code>, and plugin events arrive on the main stream as <code>rpc.*</code>. System errors are <code>rpc.unavailable</code>, <code>rpc.method_not_found</code>, <code>rpc.invalid_input</code>, <code>rpc.invalid_output</code> and <code>rpc.internal</code>. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/rpc.ts">schema/src/rpc.ts</a></p>
+<p><span class="tag t-ver">Verified</span><code>plugin-browser</code> is the worked example. The engine plugin owns the tools, invocation scope and permissions. The desktop owns tabs, CDP and captures. They connect over authenticated RPC with a versioned <code>attach</code>, a readiness event, and an explicit rule that lost calls are never replayed. This is the template for any extension that has both an agent half and a GUI half. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/plugin-browser/README.md">plugin-browser/README.md</a></p>
+<h4>The official GUI extension SDK</h4>
+<p><span class="tag t-ver">Verified</span><code>gui-extensions</code> says that "every feature of the desktop and web app that is not the core shell is an extension". Built-ins include context, btw, debug, terminal, file, review, details, browser, pairing, updater, SSH, WSL and Microsoft Office. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/gui-extensions/README.md">gui-extensions/README.md</a></p>
+<ul>
+  <li><strong>Manifest:</strong> <code>Extension.define({ id, legacy, os, provides, uses, requires, stores, i18n })</code>, read before any code loads.</li>
+  <li><strong>Tokens:</strong> <code>Registry</code> (lists others contribute to), <code>Contract</code> (in-process APIs between extensions), <code>Ipc</code> (schema-typed main-to-window contracts).</li>
+  <li><strong>Registries:</strong> Command, MenuItem, Panel, SettingsPage, Server, LinkHandler, TitlebarItem, Slot, Style, MenubarItem. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/gui-extensions/src/sdk/registries.ts">gui-extensions/src/sdk/registries.ts</a></li>
+  <li><strong>Liveness:</strong> optional dependencies arrive as <code>Live&lt;T&gt;</code>: pending, active, or inactive (restarting, disabled, failed, blocked). Required dependencies block setup.</li>
+  <li><strong>Stores:</strong> <code>Store.global</code>, <code>Store.session</code> and <code>Store.main</code>, declared up front with migrations from older keys.</li>
+  <li><strong>Discipline:</strong> the host never names an extension, extensions import only each other's <code>contract.ts</code>, the linter bans raw effects, app imports and module-level state, and a test boots the graph with each optional provider disabled.</li>
+</ul>
+<p><span class="tag t-ver">Verified</span>Groundwork for installable <code>.ocdx</code> archives exists. The manifest schema is <code>opencode.gui-extension/1</code> with CommonJS bundles. The desktop evaluates main bundles with <code>new Function</code> against a shared module map, commented "Installed extensions are trusted code the user chose to install". Renderer bundles are not loaded yet, and the IPC handler refuses install, enable and reload in packaged builds "until installed extensions have a trust model". <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/extension/module.ts">desktop/src/main/extension/module.ts</a> <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/ipc-handlers/extensions.ts">desktop/src/main/ipc-handlers/extensions.ts</a></p>
+<p><span class="tag t-ver">Verified</span>The system is new. It is absent at v2.0.20 and present at v2.0.22, from commits <code>f406d93</code> (2026-10-01, "move GUI features into built-in extensions") and <code>0048c97</code> (2026-10-04, "typed composition and lifetime primitives").</p>
+<h4>Themes, terminal UI plugins and ACP</h4>
+<ul>
+  <li><span class="tag t-ver">Verified</span>The desktop theme format is JSON with light and dark variants, each built from nine seed colors or a palette, plus token overrides. 36 themes ship. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/ui/src/theme/desktop-theme.schema.json">ui/src/theme/desktop-theme.schema.json</a></li>
+  <li><span class="tag t-ver">Verified</span>The terminal UI has its own plugin entry, <code>@opencode/plugin/tui</code>.</li>
+  <li><span class="tag t-ver">Verified</span>The CLI implements the Agent Client Protocol through <code>@agentclientprotocol/sdk</code>. It is an editor-style integration surface, narrower than the HTTP API. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/acp/agent.ts">cli/src/acp/agent.ts</a></li>
+</ul>
+
+<h3>2.9 How the official clients use the engine</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>The app is multi-server.</strong> Its initial server is the page origin when <code>opencode serve</code> hosts it, or none. Users add servers, connect with a password, or paste or scan a pairing link. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/app/README.md">app/README.md</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>The desktop keeps credentials in main.</strong> The renderer reaches main only through <code>window.electron</code> and a MessagePort RPC client, and windows run with <code>contextIsolation</code>, <code>sandbox: true</code> and no Node integration. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/AGENTS.md">desktop/AGENTS.md</a> <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/windows/appearance.ts">desktop/src/main/windows/appearance.ts</a></li>
+  <li><span class="tag t-ver">Verified</span>The desktop guidance prefers SQLite over plain files for persistence, citing Windows <code>EPERM</code> problems. The desktop keeps its own database, separate from the engine's.</li>
+</ul>
+
+<h3>2.10 How OpenCode updates will affect you</h3>
+<div class="tbl"><table>
+<thead><tr><th>Range</th><th>Dates</th><th>Operations</th><th>Schema bodies changed</th><th>Character</th></tr></thead>
+<tbody>
+<tr><td><code>v2.0.0 → v2.0.10</code></td><td class="num-cell">09-11 → 09-19</td><td class="num-cell">139 → 136</td><td class="num-cell">58</td><td><span class="r poor">Breaking</span><span class="sub">Every operationId lost its <code>v2.</code> prefix; workspace routes removed; MCP mutation moved to experimental</span></td></tr>
+<tr><td><code>v2.0.10 → v2.0.20</code></td><td class="num-cell">09-19 → 09-29</td><td class="num-cell">136 → 136</td><td class="num-cell">2</td><td><span class="r good">Stable</span></td></tr>
+<tr><td><code>v2.0.20 → v2.0.25</code></td><td class="num-cell">09-29 → 10-08</td><td class="num-cell">136 → 141</td><td class="num-cell">21</td><td><span class="r good">Additive</span><span class="sub">Added credential list and create, pairing, <code>vcs.init</code>; new optional fields; one error shape gained a required tag</span></td></tr>
+<tr><td><code>v2.0.25 → v2.0.26</code></td><td class="num-cell">10-08</td><td class="num-cell">141 → 141</td><td class="num-cell">0</td><td><span class="r good">None</span></td></tr>
+</tbody></table></div>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>Cadence:</strong> 27 tagged releases, v2.0.0 to v2.0.26, in 27 days.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Effect is a release candidate.</strong> The contract packages build on <code>effect 4.0.0-rc.112</code>, and upstream moved to rc.118 the day after v2.0.26. The client's Promise root has no runtime Effect dependency, but <code>@opencode/client/effect</code> requires the exact RC as a peer.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Packages version with the engine.</strong> <code>@opencode/client</code> 2.0.25 belongs to engine 2.0.25. OpenChamber pins both <code>@opencode/client</code> and <code>@opencode/schema</code> at exactly 2.0.25.</li>
+</ul>
+
+<h3>2.11 Reuse map</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Capability</th><th>Decision</th><th>How</th></tr></thead>
+<tbody>
+<tr><td>Find, start and stop the engine</td><td><span class="r good">Reuse</span></td><td><code>@opencode/client/service</code> in the main process</td></tr>
+<tr><td>Typed HTTP calls</td><td><span class="r good">Reuse</span></td><td><code>@opencode/client</code> Promise root, wrapped by the adapter</td></tr>
+<tr><td>Wire types</td><td><span class="r good">Reuse, adapter only</span></td><td><code>@opencode/client</code> type exports; never re-exported to features</td></tr>
+<tr><td>Remote servers and pairing</td><td><span class="r good">Reuse protocol</span></td><td><code>server.pair</code> and <code>/auth/connect/:code</code></td></tr>
+<tr><td>Agent loop, tools, providers, MCP, permission evaluation, persistence</td><td><span class="r good">Engine owns</span></td><td>Never reimplement in the client</td></tr>
+<tr><td>Theme format</td><td><span class="r good">Adopt format</span></td><td>Accept DesktopTheme JSON so OpenCode themes import unchanged</td></tr>
+<tr><td>Event reducer and cache</td><td><span class="r mixed">Study, do not depend on</span></td><td><code>@opencode/client/solid</code> is shaped by the official app; write your own reducer behind the adapter</td></tr>
+<tr><td>UI components</td><td><span class="r poor">Not used</span></td><td><code>@opencode/ui</code> is Solid and your host is React; build your own design system</td></tr>
+<tr><td>Timeline rendering</td><td><span class="r poor">Reimplement</span></td><td><code>session-ui</code> is private</td></tr>
+<tr><td>GUI extension SDK</td><td><span class="r mixed">Borrow the design</span></td><td>Private and moving; copy patterns under MIT, not the package</td></tr>
+<tr><td>Test engine</td><td><span class="r good">Reuse</span></td><td><code>@opencode/sdk</code> in-process host with an in-memory database; <code>@opencode/simulation</code> provider</td></tr>
+</tbody></table></div>
+
+<h3>2.12 Engine and client responsibilities</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Engine owns</th><th>Client owns</th><th>Shared through the contract</th></tr></thead>
+<tbody>
+<tr><td>Agent loop, model calls, retries, compaction</td><td>Presentation, layout, navigation, windows</td><td>Session lifecycle and inbox delivery</td></tr>
+<tr><td>Tool execution, shells, terminals, file mutation</td><td>Keybindings, themes, UI preferences</td><td>Permission requests (engine asks and enforces, user decides in the client)</td></tr>
+<tr><td>Permission evaluation and saved rules</td><td>Server list, connection state, credential storage</td><td>Forms (engine asks, client renders)</td></tr>
+<tr><td>Session persistence and history</td><td>Drafts, tabs, scroll, selection</td><td>Plugin RPC between engine plugins and client extensions</td></tr>
+<tr><td>Providers, credentials, integrations, MCP</td><td>Client extensions and their storage</td><td>Pairing and remote access</td></tr>
+<tr><td>Config resolution, instructions, skills, agents</td><td>Notifications, OS integration, updates</td><td>Diff and VCS views (engine computes, client renders)</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================== 3 ============================== -->
+<section id="s3">
+<h2 class="sec"><span class="num">03</span>OpenChamber analysis</h2>
+
+<h3>3.1 What it is</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span><strong>Surfaces and stack.</strong> MIT-licensed. One React UI (<code>packages/ui</code>) is shared by Electron, web and PWA, VS Code and Capacitor mobile. A Node server in <code>packages/web</code> sits between the UI and OpenCode. Electron starts that backend in-process, "never as a sidecar", and packaged builds load the UI from <code>openchamber-ui://</code> with the loopback server as the API. <a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/AGENTS.md">openchamber/AGENTS.md</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Engine dependency.</strong> It talks to OpenCode through <code>@opencode/client</code> pinned at 2.0.25, and confines wire shapes to <code>packages/ui/src/lib/opencode/</code>.</li>
+  <li><span class="tag t-ver">Verified</span><strong>Engine lifecycle.</strong> Three installation kinds: managed, external and bundled. The managed path spawns <code>opencode serve --hostname --port</code> with its own password rather than joining the shared service. A gate requires OpenCode 2.0.20 or newer and reports compatible, incompatible or unavailable. <a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/opencode/lifecycle.js">web/server/lib/opencode/lifecycle.js</a> <a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/opencode/compatibility.js">compatibility.js</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Events.</strong> The server holds one upstream SSE reader and fans events out to browsers over WebSocket. It keeps a bounded replay buffer of 2,048 events or 8 MiB and merges streaming deltas within 50 ms. It synthesizes session status from execution events, and one module maps v2 events into its own vocabulary. <a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/event-stream/DOCUMENTATION.md">web/server/lib/event-stream/DOCUMENTATION.md</a></li>
+  <li><span class="tag t-ver">Verified</span><strong>Extensions.</strong> <code>@openchamber/sdk</code> defines "guests" with a <code>package.json</code> manifest (<code>apiVersion: 1</code>, an <code>engines</code> floor). Contributions are panel, background, attach, page, status section, file editors, actions, slash commands, declarative tool-call renderers, integrations and a local service. Capabilities are approved once at install and enforced on the server. Guests run in <code>sandbox="allow-scripts"</code> iframes under a CSP that blocks all network access. Network calls go through the host, which injects credentials the page never sees. <a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/sdk/README.md">sdk/README.md</a> <a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/sdk/src/frame-policy.ts">sdk/src/frame-policy.ts</a></li>
+</ul>
+
+<h3>3.2 Patterns worth adopting</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Pattern</th><th>Where</th><th>Why it matters for you</th></tr></thead>
+<tbody>
+<tr><td>One module translates wire shapes into a client domain model; "the reducer never sees wire shapes"</td><td><code>ui/src/lib/opencode/projection.ts</code>, <code>events.ts</code></td><td>Engine changes land in one place. This is the adapter in section 6.</td></tr>
+<tr><td>Explicit compatibility gate with a floor version and named states</td><td><code>web/server/lib/opencode/compatibility.js</code></td><td>A clear user-facing state beats a silently broken client.</td></tr>
+<tr><td>Single upstream event consumer with fan-out and bounded replay</td><td><code>web/server/lib/event-stream</code></td><td>Compensates for the volatile stream when several windows or devices watch one engine.</td></tr>
+<tr><td>Sandboxed iframes, CSP <code>default-src 'none'</code>, host-proxied network, credentials held by the host</td><td><code>sdk/src/frame-policy.ts</code>, <code>web/server/lib/guests</code></td><td>Proven baseline for running untrusted UI code.</td></tr>
+<tr><td>Install-time capability grants enforced on the backend, with a <code>NOT_GRANTED</code> error</td><td><code>web/server/lib/guests/DOCUMENTATION.md</code></td><td>Security lives in the privileged layer, not in UI visibility.</td></tr>
+<tr><td>Declarative tool-call renderers (<code>match</code>, title templates, table or markdown body)</td><td><code>sdk/README.md</code>, manifest <code>tools</code></td><td>High value with zero code, and it pairs naturally with MCP tools.</td></tr>
+<tr><td>Small, capped contribution points: up to 8 actions, 8 commands, 16 tool renderers; 20 s limit on background actions</td><td><code>sdk/README.md</code></td><td>Caps keep the host predictable and the API reviewable.</td></tr>
+<tr><td>Import VS Code themes from Open VSX</td><td><code>docs/CUSTOM_THEMES.md</code></td><td>Instant theme catalog for a new ecosystem.</td></tr>
+</tbody></table></div>
+
+<h3>3.3 Limitations and lessons</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Observation</th><th>Evidence</th><th>Lesson</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-ver">Verified</span>Writes a row into OpenCode's SQLite <code>kv</code> table to re-arm the v1-to-v2 migration, with rules "verified against v2.0.8". Its own comment warns that deleting the row makes OpenCode delete its whole event log.</td><td><a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/opencode/v1-migration-topup.js">v1-migration-topup.js</a></td><td>Never touch engine storage. One wrong engine release away from data loss.</td></tr>
+<tr><td><span class="tag t-ver">Verified</span>Reads the CLI's private <code>service.json</code> environment, and its own comment says "not a published contract". It also reconstructs the engine's worktree directory layout.</td><td><a class="src" href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/environment/opencode-service-env.js">opencode-service-env.js</a></td><td>List undocumented dependencies explicitly and keep that list at zero.</td></tr>
+<tr><td><span class="tag t-inf">Inferred</span>The managed spawn passes only <code>serve --hostname --port</code>. I found no <code>OPENCODE_DB</code> override in the lifecycle code, so a managed engine can share a database with a running official service.</td><td><code>lifecycle.js</code> line 410; <code>OPENCODE_DB</code> appears only in the migration module</td><td>Join the shared service, or isolate the database. Do not do neither.</td></tr>
+<tr><td><span class="tag t-ver">Verified</span>Engine semantics are re-derived in two places. The server translates for its own consumers and synthesizes status, and the browser translates again for the UI.</td><td><code>translate-v2.js</code> and <code>ui/src/lib/opencode/events.ts</code></td><td>One translation point. The gateway forwards wire events and does not interpret them.</td></tr>
+<tr><td><span class="tag t-ver">Verified</span>Extensions are bolted on rather than being the composition model. The built-in registry is empty (<code>{"version":1,"extensions":[]}</code>), and core features live in a flat React library of 277 modules and 144 stores.</td><td><code>extensions/registry.json</code>, <code>ui/src/lib</code>, <code>ui/src/stores</code></td><td>Build first-party features on the module system from day one, or the public API will never be rich enough.</td></tr>
+<tr><td><span class="tag t-ver">Verified</span>Extensions are limited to iframes and declarative templates and cannot render into the timeline. They are unsupported in VS Code and mobile.</td><td><code>sdk/README.md</code></td><td>An acceptable trade for untrusted code. Plan a trusted tier for deeper integration.</td></tr>
+<tr><td><span class="tag t-ver">Verified</span>The <code>service</code> contribution runs a local process "with the user's full access and no sandbox".</td><td><code>sdk/README.md</code>, <code>GUEST_SERVICES.md</code></td><td>A privileged escape hatch needs a separate trust tier and review, not one install checkbox.</td></tr>
+<tr><td><span class="tag t-ver">Verified</span><code>engines.openchamber</code> accepts only an exact version or a floor (<code>&gt;=x.y.z</code>).</td><td><code>sdk/src/api-version.ts</code></td><td>Allow upper bounds so an extension can declare a breaking host as incompatible.</td></tr>
+</tbody></table></div>
+
+<h3>3.4 Side by side</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Concern</th><th>Official OpenCode app (v2.0.25)</th><th>OpenChamber</th><th>Recommended for you</th></tr></thead>
+<tbody>
+<tr><td>Composition</td><td>Built-in extensions on a typed internal SDK</td><td>Monolithic React app plus guest iframes</td><td>Internal module SDK for first-party, separate public API</td></tr>
+<tr><td>Engine connection</td><td>Joins the shared service; pins the exact version on launch</td><td>Spawns its own engine, or uses an external or bundled one</td><td>Join without replacing; isolated database only when asked</td></tr>
+<tr><td>Event handling</td><td>Per-window SSE, resync on reconnect</td><td>Server hub, WebSocket fan-out, replay buffer</td><td>One SSE per server in Electron main, fanned out to windows</td></tr>
+<tr><td>Third-party isolation</td><td>None yet; archives are "trusted code"</td><td>Sandboxed iframes, server-enforced grants</td><td>Sandboxed iframes, grants enforced in main</td></tr>
+<tr><td>Distribution</td><td>Archive groundwork, refused in packaged builds</td><td>Folder, zip, https or SSH git</td><td>Folder and zip, then a curated index, then a registry</td></tr>
+<tr><td>Theming</td><td>DesktopTheme JSON, 36 built-ins</td><td>JSON themes, VS Code import</td><td>DesktopTheme-compatible tokens plus VS Code import</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================== 4 ============================== -->
+<section id="s4">
+<h2 class="sec"><span class="num">04</span>Requirements and architectural constraints</h2>
+
+<h3>4.1 Requirements from the brief</h3>
+<ul>
+  <li><strong>R1 Engine independence.</strong> The engine keeps agent execution. The client talks to it only through defined interfaces and does not fork it unless that is unavoidable.</li>
+  <li><strong>R2 Modularity.</strong> Explicit modules with stated responsibilities and interfaces.</li>
+  <li><strong>R3 Customization.</strong> Appearance, behavior, layout, commands, keybindings and settings.</li>
+  <li><strong>R4 Ecosystem.</strong> Create, distribute, install, update, enable, disable and remove community extensions.</li>
+  <li><strong>R5 Composable UI.</strong> Independently developed modules, shared tokens and primitives, replaceable panels and layouts.</li>
+  <li><strong>R6 Safety.</strong> Third-party code must not silently gain filesystem, command, network or agent access.</li>
+  <li><strong>R7 Upgrade resilience.</strong> OpenCode upgrades must not routinely break the client or its extensions.</li>
+  <li><strong>R8 More surfaces later.</strong> Web and mobile follow once the desktop works, and they should reuse the same core rather than fork it.</li>
+  <li><strong>R9 User-installed engine.</strong> Users install OpenCode themselves. The client ships no engine binary.</li>
+</ul>
+
+<h3>4.2 Quality attributes, in priority order</h3>
+<p><span class="tag t-rec">Recommendation</span>When goals conflict, resolve them in this order:</p>
+<ol>
+  <li><strong>User control and security.</strong> An AI agent with tool access magnifies any extension compromise.</li>
+  <li><strong>Correctness of agent state.</strong> The user must never act on a stale or wrong picture of what the agent did.</li>
+  <li><strong>Upgrade resilience</strong> against a fast-moving engine.</li>
+  <li><strong>Extensibility.</strong></li>
+  <li><strong>Performance and memory.</strong></li>
+  <li><strong>Initial delivery speed.</strong></li>
+</ol>
+
+<h3>4.3 Non-negotiable boundaries</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>ID</th><th>Constraint</th><th>Derived from</th></tr></thead>
+<tbody>
+<tr><td>C1</td><td>Integrate only through the HTTP API, the SSE stream, PTY WebSockets, plugin RPC, the registration file via <code>@opencode/client/service</code>, and published packages.</td><td>2.7; OpenChamber lesson</td></tr>
+<tr><td>C2</td><td>Never read or write the engine database, CLI-private files or the data-directory layout.</td><td>2.7; <code>v1-migration-topup.js</code></td></tr>
+<tr><td>C3</td><td>Never replace a running shared service without explicit user consent.</td><td>2.2</td></tr>
+<tr><td>C4</td><td>Never run a second engine against the user's default database.</td><td>2.2 (inferred hazard)</td></tr>
+<tr><td>C5</td><td>Treat the event stream as lossy. Every view must be rebuildable from snapshots.</td><td>2.4</td></tr>
+<tr><td>C6</td><td>Send only request fields the connected engine version accepts.</td><td>2.3 strict bodies</td></tr>
+<tr><td>C7</td><td>Keep the engine credential in the main process. No renderer code or extension may see it.</td><td>2.3, 2.6, 2.9</td></tr>
+<tr><td>C8</td><td>Do not expose Effect, OpenCode or UI-framework types in the public extension API.</td><td>2.10 Effect RC; framework neutrality</td></tr>
+<tr><td>C9</td><td>Extensions never answer permission requests or change permission rules.</td><td>2.6</td></tr>
+<tr><td>C10</td><td>Do not impersonate the official app: no <code>oc://renderer</code> origin, no OpenCode branding.</td><td>2.3 CORS; OpenCode README naming note</td></tr>
+<tr><td>C11</td><td>Gateway and extension-authority logic must not import Electron. Electron stays in a thin host layer.</td><td>R8, so a server can host the same code later</td></tr>
+</tbody></table></div>
+
+<h3>4.4 Assumptions</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>ID</th><th>Assumption</th><th>What would invalidate it</th></tr></thead>
+<tbody>
+<tr><td>A1</td><td><span class="tag t-asm">Assumption</span>The audited HTTP API remains the integration contract for third-party clients.</td><td>Upstream declares it internal, or moves clients to another transport or auth scheme.</td></tr>
+<tr><td>A2</td><td><span class="tag t-asm">Assumption</span>One shared background service per user remains the norm.</td><td>Per-client engines become standard, or the registration file changes shape.</td></tr>
+<tr><td>A3</td><td><span class="tag t-asm">Assumption</span>Users want sessions shared with the TUI and the official desktop.</td><td>Your audience prefers isolated history; then isolated mode becomes the default.</td></tr>
+<tr><td>A4</td><td><span class="tag t-dec">Decided</span>Desktop ships first; web and mobile follow on the same core.</td><td>Web or mobile becomes urgent before the desktop is stable. The portable gateway (6.10) keeps that switch cheap.</td></tr>
+<tr><td>A5</td><td><span class="tag t-asm">Assumption</span>Chromium's iframe sandbox plus a strict CSP is adequate isolation for untrusted UI code.</td><td>A threat model demanding process isolation per extension, which costs more memory.</td></tr>
+<tr><td>A6</td><td><span class="tag t-asm">Assumption</span>Community authors accept iframe views and declarative contributions for untrusted extensions.</td><td>Demand for native in-timeline rendering by untrusted code.</td></tr>
+<tr><td>A7</td><td><span class="tag t-asm">Assumption</span>Upstream will not make the official desktop an open extension platform soon enough to make your client redundant.</td><td>Upstream ships <code>.ocdx</code> renderer bundles with a trust model and a registry.</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================== 5 ============================== -->
+<section id="s5">
+<h2 class="sec"><span class="num">05</span>Architecture alternatives</h2>
+<p>Four realistic approaches. The comparison rates each criterion from your point of view: green is favorable, amber is mixed, red is unfavorable.</p>
+<ol>
+  <li><strong>Monolith with internal modules.</strong> One app with folders and conventions. No third-party code. OpenChamber's core looks like this.</li>
+  <li><strong>Modular core with a formal in-process extension API.</strong> Extensions load as code into the renderer and render native components. Obsidian works this way. VS Code is similar, with its extension host in a separate process but unsandboxed.</li>
+  <li><strong>Plugin-oriented, everything is a plugin, one trust level.</strong> Core features and third-party features use the same API. OpenCode's own <code>gui-extensions</code> works this way for built-ins, and its <code>.ocdx</code> groundwork extends the same trust to installed archives.</li>
+  <li><strong>Hybrid.</strong> A stable core, first-party feature modules on an internal SDK, a separate public API with sandboxed tiers, and engine plugins for agent-side work.</li>
+</ol>
+
+<div class="tbl wide"><table>
+<thead><tr><th>Criterion</th><th>1 Monolith</th><th>2 Modular core plus in-process API</th><th>3 Everything is a plugin</th><th>4 Hybrid, staged</th></tr></thead>
+<tbody>
+<tr><td>Initial complexity</td><td><span class="r good">Low</span></td><td><span class="r mixed">Medium</span></td><td><span class="r poor">High</span></td><td><span class="r mixed">Medium if staged</span></td></tr>
+<tr><td>Runtime cost</td><td><span class="r good">Lowest</span></td><td><span class="r good">Low</span></td><td><span class="r mixed">Indirection, lazy activation needed</span></td><td><span class="r mixed">Low for first-party; one iframe per third-party view</span></td></tr>
+<tr><td>Developer experience</td><td><span class="r mixed">Fast early, degrades</span></td><td><span class="r good">Good</span></td><td><span class="r mixed">Strong boundaries, more ceremony</span></td><td><span class="r good">Good; two clearly separated APIs</span></td></tr>
+<tr><td>UI composability</td><td><span class="r poor">By convention only</span></td><td><span class="r good">High</span></td><td><span class="r good">High</span></td><td><span class="r good">High for first-party</span><span class="sub">Bounded for third-party</span></td></tr>
+<tr><td>Extension authoring</td><td><span class="r poor">None</span></td><td><span class="r good">Rich, native</span></td><td><span class="r good">Rich</span></td><td><span class="r mixed">Simple and async, any framework, less native</span></td></tr>
+<tr><td>Security boundaries</td><td><span class="r good">No third-party code</span></td><td><span class="r poor">Full renderer access</span></td><td><span class="r poor">Same trust for everyone</span></td><td><span class="r good">Capabilities, sandbox, host-held secrets</span></td></tr>
+<tr><td>API stability</td><td><span class="r good">Nothing public</span></td><td><span class="r poor">Internals leak through in-process objects</span></td><td><span class="r poor">The whole app becomes public API</span></td><td><span class="r good">Small serializable surface</span></td></tr>
+<tr><td>Testing and debugging</td><td><span class="r good">Simple</span></td><td><span class="r mixed">Medium</span></td><td><span class="r mixed">Graph testing needed</span></td><td><span class="r mixed">Medium to high</span></td></tr>
+<tr><td>OpenCode version compatibility</td><td><span class="r mixed">Depends on discipline</span></td><td><span class="r mixed">Extensions may bind to engine shapes</span></td><td><span class="r mixed">Same</span></td><td><span class="r good">Adapter plus capability-gated API</span></td></tr>
+<tr><td>Packaging and distribution</td><td><span class="r good">One bundle</span></td><td><span class="r mixed">Dynamic loading, shared dependency conflicts</span></td><td><span class="r mixed">Same</span></td><td><span class="r mixed">Packages plus registry, staged</span></td></tr>
+<tr><td>Long-term community scale</td><td><span class="r poor">None</span></td><td><span class="r mixed">Grows fast, frequent incidents</span></td><td><span class="r mixed">Grows, hard to evolve</span></td><td><span class="r good">Grows safely</span></td></tr>
+</tbody></table></div>
+
+<h3>Verdict</h3>
+<p><span class="tag t-rec">Recommendation</span>Choose <strong>approach 4, built in stages</strong>. Start where approach 3 is strongest: first-party features as modules on an internal SDK, the way OpenCode's own app proves out. That gives you the boundaries and the contribution registries without promising anything publicly. Publish a declarative tier as soon as the registries settle, since it is safe and covers most customization. Add sandboxed code extensions only after the first-party modules have shown which contribution points matter. Keep the internal SDK and the public API as separate surfaces permanently. That separation is what lets the internal side change every release while extensions keep working.</p>
+<p>Approach 2 is the main temptation, because rich native extensions attract authors quickly. It is the wrong default here. An extension running in your renderer can reach the store, the DOM and every command, and in an agent client that adds up to sending prompts and approving tool runs. Offer that level of access later as an explicit trusted tier, never as the baseline.</p>
+
+<div class="tbl wide"><table>
+<thead><tr><th>Abstraction</th><th>When</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>Engine adapter and client domain model</td><td><span class="r good">Day one</span></td><td>Engine churn is certain (2.10). Retrofitting an adapter means touching every feature.</td></tr>
+<tr><td>Engine gateway in main</td><td><span class="r good">Day one</span></td><td>Credentials, CORS and multi-window streams all need it.</td></tr>
+<tr><td>Host-neutral gateway core and transport-neutral RPC</td><td><span class="r good">Day one</span></td><td>Web and mobile are planned (R8). Keeping Electron out of the core costs little now and avoids a rewrite later.</td></tr>
+<tr><td>Contribution registries, command service, keybindings</td><td><span class="r good">Day one</span></td><td>Every feature uses them; they are the composition backbone.</td></tr>
+<tr><td>Module manifest with provides, uses and requires</td><td><span class="r good">Day one</span></td><td>Cheap at the start, expensive to retrofit.</td></tr>
+<tr><td>Layered settings with contributed schemas</td><td><span class="r good">Day one</span></td><td>Modules own their settings, so the host never names a module.</td></tr>
+<tr><td>Design tokens and theme engine</td><td><span class="r good">Day one</span></td><td>Themes are the first community contribution people expect.</td></tr>
+<tr><td>Capability vocabulary</td><td><span class="r mixed">Design early, enforce in Phase 3</span></td><td>Shapes the public API even before third-party code runs.</td></tr>
+<tr><td>Sandboxed extension runtime</td><td><span class="r mixed">Phase 3</span></td><td>Needs a stable set of contribution points first.</td></tr>
+<tr><td>Extension dependencies beyond a simple requires list</td><td><span class="r poor">Defer</span></td><td>No demonstrated need. Dependency graphs are a major source of support load.</td></tr>
+<tr><td>Registry, signing, publisher verification</td><td><span class="r poor">Defer to Phase 5</span></td><td>Needs real extensions and real publishers first.</td></tr>
+<tr><td>Privileged Node services for extensions</td><td><span class="r poor">Defer</span></td><td>The highest risk for the least common need.</td></tr>
+<tr><td>Generic multi-engine abstraction</td><td><span class="r poor">Do not build</span></td><td>The adapter isolates OpenCode versions. It is not a portability layer. Revisit only if a second engine becomes a real requirement.</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================== 6 ============================== -->
+<section id="s6">
+<h2 class="sec"><span class="num">06</span>Recommended architecture</h2>
+
+<h3>6.1 High-level view</h3>
+<div class="figure">
+<pre class="mermaid">
+flowchart TB
+  subgraph R["Renderer process, one per window"]
+    shell["App shell: layout regions, routing, windows"]
+    core["Application core: registries, commands, keybindings, settings, store, event bus"]
+    feat["First-party feature modules"]
+    ui["Design system: tokens, primitives, theme engine"]
+    xhost["Extension host: manifests, capability checks, sandbox bridge"]
+    frames["Sandboxed extension frames"]
+    adapter["Engine adapter: typed client over IPC fetch, wire to domain translation"]
+  end
+  subgraph M["Electron main process"]
+    gateway["Engine gateway: discovery, credentials, one SSE per server, request proxy"]
+    xauth["Extension authority: registry, grants, storage, installs"]
+    store["Client storage: SQLite and migrations"]
+    platform["Platform: menus, notifications, updates, keychain, protocols"]
+    svc["Privileged extension services, deferred"]
+  end
+  engine["OpenCode engine: shared service or paired remote server"]
+  eplug["OpenCode engine plugins: tools, agents, RPC"]
+  shell --> core
+  feat --> core
+  feat --> ui
+  xhost --> core
+  frames -- "postMessage JSON-RPC" --> xhost
+  core --> adapter
+  adapter -- "MessagePort RPC" --> gateway
+  xhost -- "MessagePort RPC" --> xauth
+  core -- "MessagePort RPC" --> store
+  core -- "MessagePort RPC" --> platform
+  gateway -- "HTTP, SSE, WebSocket" --> engine
+  engine --> eplug
+  svc -.-> xauth
+</pre>
+<figcaption>Proposed layers. Only the gateway opens connections to the engine, and only the adapter understands its payloads.</figcaption>
+</div>
+
+<h3>6.2 Modules and their boundaries</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Module</th><th>Runs in</th><th>Owns</th><th>Must not</th></tr></thead>
+<tbody>
+<tr><td><strong>Engine gateway</strong> <code>@app/gateway-core</code>, hosted by <code>@app/gateway-electron</code></td><td>Main on desktop; a Node server later for web and mobile</td><td>Server list, discovery and start policy, credentials in the OS keychain, one SSE subscription per server, request forwarding with auth, <code>/api/info</code> and <code>/openapi.json</code> probing, the connection state machine</td><td>Interpret events, derive status, cache domain state</td></tr>
+<tr><td><strong>Engine adapter</strong> <code>@app/engine-opencode</code></td><td>Renderer (pure translation also usable in main)</td><td>The typed <code>@opencode/client</code> instance over an IPC-backed <code>fetch</code>, domain mapping, capability flags, version shims, idempotency keys</td><td>Render UI, hold credentials, leak wire types</td></tr>
+<tr><td><strong>Domain model</strong> <code>@app/domain</code></td><td>Shared types</td><td>Client-owned types: sessions, timeline items, requests, capabilities, domain events</td><td>Import OpenCode, Effect or UI frameworks</td></tr>
+<tr><td><strong>Application core</strong> <code>@app/core</code></td><td>Renderer</td><td>Registries, command service, keybinding resolver, settings service, store, domain event bus, module lifecycle, diagnostics</td><td>Name specific modules or contain feature logic</td></tr>
+<tr><td><strong>App shell</strong></td><td>Renderer</td><td>Window layout regions (side, dock, main, titlebar, status), routing, focus, command palette host</td><td>Know what fills a region</td></tr>
+<tr><td><strong>Feature modules</strong> (sessions, timeline, composer, requests, review, files, terminal, settings UI, extension manager UI, notifications)</td><td>Renderer</td><td>One feature each, with its contributions, stores and copy</td><td>Import other modules' internals, call the engine directly</td></tr>
+<tr><td><strong>Design system</strong> <code>@app/ui</code></td><td>Renderer and extension kit</td><td>Tokens as CSS variables, primitives, theme loading and VS Code import, icon catalog</td><td>Depend on app state</td></tr>
+<tr><td><strong>Extension host</strong> <code>@app/extension-host</code></td><td>Renderer</td><td>Frame lifecycle, the postMessage bridge, mapping public API calls onto core services, contribution merging</td><td>Decide grants (main does), expose internal objects</td></tr>
+<tr><td><strong>Extension authority</strong></td><td>Main on desktop; the same server later</td><td>Installed packages, versions, integrity hashes, enable state, grants, quotas, extension storage, update and rollback</td><td>Trust renderer claims about identity or grants</td></tr>
+<tr><td><strong>Client storage</strong></td><td>Main</td><td>SQLite database, forward-only migrations, declared stores, backups</td><td>Store engine-owned data as truth</td></tr>
+<tr><td><strong>Platform</strong></td><td>Main</td><td>Native menus, tray, notifications, deep links, auto-update, file dialogs, custom protocols</td><td>Contain feature logic</td></tr>
+</tbody></table></div>
+
+<h3>6.3 Dependency rules</h3>
+<div class="figure">
+<pre class="mermaid">
+flowchart LR
+  ext["Third-party extension"] --> eapi["@app/extension-api, public"]
+  feat["Feature module"] --> sdk["@app/sdk, internal"]
+  feat --> uikit["@app/ui"]
+  feat --> peer["Another module's contract.ts"]
+  core["@app/core"] --> sdk
+  xhost["@app/extension-host"] --> core
+  xhost --> eapi
+  sdk --> domain["@app/domain"]
+  eapi --> domain
+  core --> adapter["@app/engine-opencode"]
+  adapter --> domain
+  adapter --> occ["@opencode/client types and Promise client"]
+  gwhost["@app/gateway-electron, thin host"] --> gateway["@app/gateway-core, no Electron"]
+  gateway --> ocs["@opencode/client/service"]
+  gateway --> ipc["@app/rpc-contracts, transport-neutral"]
+  core --> ipc
+</pre>
+<figcaption>Allowed edges. Anything not drawn is prohibited.</figcaption>
+</div>
+<div class="tbl wide"><table>
+<thead><tr><th>From</th><th>Prohibited</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Feature modules</td><td><code>@opencode/*</code>, adapter internals, any network call to the engine</td><td>Engine coupling stays in one package</td></tr>
+<tr><td>Feature modules</td><td>Another module's files other than its <code>contract.ts</code>; core internals</td><td>Modules stay replaceable</td></tr>
+<tr><td>Third-party extensions</td><td>Anything except <code>@app/extension-api</code>; host DOM, Node, direct network</td><td>Security and API stability</td></tr>
+<tr><td>Renderer code</td><td>Node and Electron APIs, the engine password</td><td>Process sandbox</td></tr>
+<tr><td>Gateway</td><td>Status derivation, projections, any other domain logic</td><td>One translation point</td></tr>
+<tr><td><code>@app/gateway-core</code></td><td><code>electron</code>, DOM APIs, React</td><td>It must run unchanged inside a server later (C11)</td></tr>
+<tr><td>Core and shell</td><td>Module ids, command ids, stored key formats of specific modules</td><td>The host never names a module, as in upstream's host-boundary rule</td></tr>
+<tr><td><code>@app/extension-api</code></td><td>Solid, React, Effect or OpenCode types</td><td>Framework and engine neutrality</td></tr>
+<tr><td>Everything</td><td>Engine database, CLI-private files, data-directory paths</td><td>No contract exists (C2)</td></tr>
+</tbody></table></div>
+<p><span class="tag t-rec">Recommendation</span>Enforce these rules mechanically: package <code>exports</code> maps that expose only entry points, TypeScript project references, <code>no-restricted-imports</code> or dependency-cruiser rules in CI, and an API report (API Extractor) for <code>@app/extension-api</code> so any public change shows up in review. Upstream's <code>gui-extensions</code> lint gate is a working precedent.</p>
+
+<h3>6.4 Communication mechanisms</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Mechanism</th><th>Use for</th><th>Not for</th></tr></thead>
+<tbody>
+<tr><td>Commands (id, handler, return value)</td><td>User actions, keybindings, menus, palette, extension-triggered actions</td><td>Queries or high-frequency updates</td></tr>
+<tr><td>Registries (contribution points)</td><td>Declaring panels, menus, status items, settings pages, tool renderers, link handlers</td><td>Runtime messaging</td></tr>
+<tr><td>Store (reactive, read-only to modules)</td><td>Engine-derived and client state</td><td>Mutation. Write through commands or services.</td></tr>
+<tr><td>Domain event bus (typed, past tense)</td><td>Reacting to facts: session went idle, permission asked, connection lost</td><td>Requesting work</td></tr>
+<tr><td>Contracts (typed tokens with a liveness status)</td><td>Module-to-module services such as a file tree or a diff renderer</td><td>Crossing a trust boundary</td></tr>
+<tr><td>MessagePort RPC, schema-validated</td><td>Renderer to main: gateway, storage, platform, extension authority</td><td>Calls within one renderer</td></tr>
+<tr><td>postMessage JSON-RPC, versioned envelope</td><td>Extension host to sandboxed frames</td><td>Trusted modules</td></tr>
+<tr><td>HTTP, SSE, WebSocket</td><td>Gateway to engine only</td><td>Anything else</td></tr>
+</tbody></table></div>
+<p><span class="tag t-ver">Verified</span>The IPC-backed transport needs no fork. <code>@opencode/client</code>'s <code>ClientOptions</code> accepts a custom <code>fetch</code>, so the renderer adapter can hold a fully typed client whose requests travel to main, gain the Authorization header there, and go to the engine. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/promise/generated/client.ts#L273">client/src/promise/generated/client.ts</a></p>
+
+<h3>6.5 State ownership</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>State</th><th>Owner</th><th>Persistence</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Sessions, messages, inbox, permissions, forms, config, providers, credentials, MCP, terminals</td><td>Engine</td><td>Engine database</td><td>The client cache is disposable and invalidated on every resync</td></tr>
+<tr><td>Derived views: session activity, timeline grouping, unread markers</td><td>Adapter and store</td><td>None, recomputed</td><td>One derivation point</td></tr>
+<tr><td>Server list and connection preferences</td><td>Gateway</td><td>Client SQLite; secrets via Electron <code>safeStorage</code></td><td>Remote tokens never reach the renderer</td></tr>
+<tr><td>Layout, tabs, panel state, drafts</td><td>Each module</td><td>Declared stores in client SQLite</td><td>Scoped globally, per project or per session; migrations declared with the store</td></tr>
+<tr><td>Settings</td><td>Settings service</td><td>Defaults, then user, then project</td><td>Schemas contributed by modules and extensions</td></tr>
+<tr><td>Keybindings and themes</td><td>Core</td><td>User-editable JSON plus SQLite index</td><td>Validated against versioned schemas</td></tr>
+<tr><td>Installed extensions, versions, enable state, grants</td><td>Extension authority</td><td>Client SQLite</td><td>The only source for capability checks</td></tr>
+<tr><td>Extension data</td><td>Each extension, namespaced</td><td>Client SQLite with quotas; secrets in the keychain</td><td>Kept on disable, removed on uninstall after a grace period</td></tr>
+</tbody></table></div>
+<p>Project identity comes from the engine's <code>Location.project</code> id, so per-project state follows the project rather than a path string.</p>
+
+<h3>6.6 Lifecycles</h3>
+<h4>Application start and stop</h4>
+<ol>
+  <li>Main opens the client database, runs migrations and reads extension manifests. No extension code runs at this point.</li>
+  <li>Main shows a window skeleton at once and starts gateway discovery in parallel.</li>
+  <li>The renderer boots the core, sets up first-party modules synchronously (contributions only, no engine calls) and merges declarative extension contributions.</li>
+  <li>The gateway discovers the engine, starts one if policy allows, checks version and capabilities, then opens the event stream.</li>
+  <li>On <code>server.connected</code>, windows hydrate visible state and the <code>onEngineConnected</code> activation event fires.</li>
+  <li>Sandboxed extensions activate lazily on their declared events.</li>
+  <li>On quit: deactivate extensions with a time limit, flush stores, close streams. Never stop the shared engine.</li>
+</ol>
+<h4>Engine connection</h4>
+<div class="figure">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Discovering
+  Discovering --> Connecting: registration found
+  Discovering --> Starting: none found and start allowed
+  Discovering --> NoEngine: none found and start not allowed
+  Starting --> Connecting: service ready
+  Starting --> Failed: spawn or readiness failed
+  Connecting --> Unauthorized: 401
+  Connecting --> Incompatible: info 404 or version out of range
+  Connecting --> Hydrating: server.connected
+  Hydrating --> Live: snapshots loaded
+  Live --> Resyncing: stream ended, stalled or overflowed
+  Resyncing --> Hydrating: server.connected
+  Resyncing --> Discovering: registration replaced
+  Unauthorized --> Connecting: credentials refreshed
+  Incompatible --> Discovering: user chose an action
+  Failed --> Discovering: retry
+</pre>
+<figcaption>Every state is visible in the UI. A feature that cannot work in the current state shows why. It never presents a dead button or an endless spinner, which is upstream's own rule for its extensions.</figcaption>
+</div>
+<h4>Modules</h4>
+<p>First-party modules use the liveness model upstream already proved: <em>pending</em>, <em>active</em>, or <em>inactive</em> because the module is restarting, disabled, failed or blocked. Optional dependencies arrive as a live value that degrades gracefully. Required dependencies block setup until the provider returns. Everything a module registers is withdrawn when it leaves the active state. Setup is synchronous, and async work runs in owned tasks that check an abort signal after every await.</p>
+<p><span class="tag t-rec">Recommendation</span>Upstream ties these lifetimes to Solid's ownership tree. React has no equivalent, so make them explicit. <code>ctx.add</code> returns a disposable, each module instance owns a disposal scope and an <code>AbortSignal</code>, and the host disposes the scope when the module leaves the active state. Components reach the module context through a hook such as <code>useModule()</code>.</p>
+
+<h3>6.7 Errors, events and reconnection</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Class</th><th>Example</th><th>Handling</th></tr></thead>
+<tbody>
+<tr><td>Transport</td><td>Refused connection, stall, queue overflow</td><td>Enter Resyncing; mark affected views stale; back off and retry</td></tr>
+<tr><td>Authentication</td><td>401</td><td>Re-read the registration (the password may have rotated), otherwise ask to pair again</td></tr>
+<tr><td>Incompatible</td><td><code>/api/info</code> 404, version outside range, missing required capability</td><td>Incompatible state with clear actions; read-only features continue where safe</td></tr>
+<tr><td>Typed domain error</td><td><code>SessionNotFound</code>, <code>InvalidCursor</code>, form already settled</td><td>Handled by the feature; the adapter maps it to a domain error</td></tr>
+<tr><td>Validation</td><td>400 from a strict request body</td><td>Treat as version skew or an adapter bug; attach to the diagnostic bundle</td></tr>
+<tr><td>Engine failure</td><td>500 <code>UnknownError</code></td><td>Report; never auto-retry a non-idempotent call</td></tr>
+<tr><td>Extension fault</td><td>Setup throws, RPC timeout</td><td>Isolate; mark failed; auto-disable after repeated faults; offer safe mode</td></tr>
+</tbody></table></div>
+<div class="figure">
+<pre class="mermaid">
+sequenceDiagram
+  participant W as Window core and adapter
+  participant G as Gateway in main
+  participant E as OpenCode service
+  G->>E: discover via service.json, GET /api/info
+  E-->>G: version, pid, capabilities
+  G->>E: GET /openapi.json, cached per version
+  G->>E: GET /api/event, one stream per server
+  E-->>G: server.connected
+  G-->>W: Live, capabilities, server.connected
+  W->>G: session.active, pending requests, visible pages
+  G->>E: forwarded with Basic auth
+  E-->>G: snapshots
+  G-->>W: snapshots
+  E-->>G: deltas such as session.text.delta
+  G-->>W: batched events
+  Note over G,E: overflow, 45 s stall or network loss
+  G->>E: reconnect GET /api/event
+  E-->>G: server.connected
+  G-->>W: resync marker
+  W->>G: refetch visible state, replace partial parts
+</pre>
+<figcaption>Start and resync. The gateway forwards raw wire events; windows translate them through the adapter.</figcaption>
+</div>
+<ul>
+  <li><span class="tag t-rec">Recommendation</span>Treat every stream end as possible data loss. Bump a store generation and refetch active sessions, pending permissions and forms, and the latest page of each visible session. The stream does not replay requests asked while you were away, as upstream's auto-approve comment confirms.</li>
+  <li><span class="tag t-rec">Recommendation</span>When a reconnect interrupts a streamed message, replace its partial parts with <code>session.message.get</code> rather than replaying deltas.</li>
+  <li><span class="tag t-inf">Inferred</span>Durable events carry <code>aggregateID</code> and a per-aggregate <code>seq</code>, so a gap in a durable sequence can trigger a targeted refetch even without a disconnect.</li>
+  <li><span class="tag t-rec">Recommendation</span>Generate <code>msg_…</code> ids on the client for prompts, and retry with the same id after an uncertain outcome.</li>
+  <li><span class="tag t-rec">Recommendation</span>Ignore and count unknown event types. A new engine event must never crash an older client.</li>
+  <li><span class="tag t-rec">Recommendation</span>A failed fetch must never look like an empty result. This is one of OpenChamber's correctness invariants, and it is worth copying.</li>
+</ul>
+
+<h3>6.8 Versioning</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Surface</th><th>Scheme</th><th>Promise</th></tr></thead>
+<tbody>
+<tr><td>Internal module SDK and core</td><td>App version, one monorepo</td><td>None. Refactor freely; the compiler checks callers.</td></tr>
+<tr><td>Main and renderer IPC contracts</td><td>Same build</td><td>Both ends ship together; schemas validate every message</td></tr>
+<tr><td>Public extension API</td><td><code>apiVersion</code> integer plus npm semver of <code>@app/extension-api</code></td><td>Additive within a major. Deprecations last at least two minor releases. The host supports the current and previous major for a stated period.</td></tr>
+<tr><td>Extension manifest</td><td><code>apiVersion</code>, <code>engines.app</code> range, optional <code>engines.opencode</code> range</td><td>Install refused when unmet; upper bounds allowed</td></tr>
+<tr><td>Theme, keybinding and settings files</td><td><code>$schema</code> URL with a version</td><td>Migrated on load</td></tr>
+<tr><td>Engine adapter</td><td>Declared supported OpenCode range</td><td>Enforced at connect, with a supported, untested or unsupported state</td></tr>
+<tr><td>Client database</td><td>Migration number</td><td>Forward-only, with a backup before each migration</td></tr>
+</tbody></table></div>
+
+<h3>6.9 Illustrative contracts</h3>
+<p><span class="tag t-rec">Recommendation</span>These sketches show shape and ownership. Validate them in the prototype before treating them as fixed.</p>
+<pre><code>// @app/domain: owned by you. No OpenCode, Effect or UI framework imports.
+export type SessionId = string &amp; { readonly brand: "SessionId" }
+
+export interface EngineCapabilities {
+  readonly pairing: boolean              // server.pair exists (added after 2.0.20)
+  readonly persistentTerminals: boolean  // ServerInfo.capabilities.persistentPty
+  readonly forkBeforeMessage: boolean
+  readonly experimental: ReadonlySet&lt;string&gt; // operation ids under /api/experimental
+}
+
+export interface EngineInfo {
+  readonly version: string
+  readonly capabilities: EngineCapabilities
+  readonly support: "supported" | "untested" | "unsupported"
+}
+
+export type DomainEvent =
+  | { readonly type: "session.changed"; readonly session: SessionSummary }
+  | { readonly type: "session.activity"; readonly sessionId: SessionId; readonly status: "running" | "idle" | "retrying" }
+  | { readonly type: "timeline.patch"; readonly sessionId: SessionId; readonly patch: TimelinePatch }
+  | { readonly type: "request.opened"; readonly request: PendingRequest }
+  | { readonly type: "request.closed"; readonly requestId: string }
+  | { readonly type: "resync"; readonly reason: "reconnected" | "overflow" | "gap" }</code></pre>
+<pre><code>// @app/engine-opencode: the only package that imports @opencode/*
+import { OpenCode } from "@opencode/client"
+
+export function createAdapter(serverId: ServerId, gatewayFetch: typeof fetch): EngineAdapter {
+  // Requests leave the renderer through MessagePort; main adds Authorization and forwards.
+  const client = OpenCode.make({ baseUrl: `https://engine.invalid/${serverId}/`, fetch: gatewayFetch })
+  return {
+    sessions: {
+      prompt: (input) =&gt; client.session.prompt({ sessionID: input.sessionId, id: input.clientMessageId, text: input.text }),
+      // ...
+    },
+    translate: (wire) =&gt; translateEvent(wire), // pure; unknown types return [] and are counted
+  }
+}</code></pre>
+<pre><code>// @app/sdk: internal module API in React, modeled on upstream gui-extensions. Free to change per release.
+export default Module.define({
+  id: "review",
+  requires: { sessions: Sessions },          // blocked while unavailable
+  uses: { files: FileTree },                  // Live&lt;FileTree&gt;, degrades gracefully
+  stores: { prefs: Store.global(ReviewPrefs, { layout: "split" }) },
+})
+
+const setup: Setup&lt;typeof definition&gt; = (ctx) =&gt; {
+  ctx.add(Command, { id: "open", title: ctx.t("open"), run: () =&gt; ctx.layout.open("review") })
+  ctx.add(Panel, { id: "main", region: "side", render: (props) =&gt; &lt;ReviewPanel session={props.session} /&gt; })
+}</code></pre>
+<p class="caption"><span class="tag t-ver">Verified</span>The adapter call matches the generated Promise client at 2.0.25: <code>client.session.prompt({ sessionID, id, text, … })</code> posts to <code>/api/session/{sessionID}/prompt</code> and serializes only the fields you set. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/promise/generated/client.ts#L715">client/src/promise/generated/client.ts</a></p>
+
+<h3 id="s6-web">6.10 Path to web and mobile</h3>
+<p><span class="tag t-rec">Recommendation</span>Ship the desktop first, but split the gateway now. <code>@app/gateway-core</code> holds discovery, credentials, the event stream, request forwarding and the extension authority, and imports no Electron. On desktop, <code>@app/gateway-electron</code> hosts it in the main process and speaks to windows over MessagePort. For web and mobile, a small Node server hosts the same core and speaks the same RPC over WebSocket.</p>
+<div class="figure">
+<pre class="mermaid">
+flowchart LR
+  subgraph desktop["Desktop, phase 1"]
+    dui["React UI in Electron windows"] -- "MessagePort RPC" --> dhost["gateway-electron"]
+    dhost --> dcore["gateway-core"]
+  end
+  subgraph remote["Web and mobile, later"]
+    wui["Same React UI in a browser"] -- "WebSocket RPC" --> shost["gateway-server, with its own login"]
+    mui["Capacitor shell around the web build"] -- "WebSocket RPC" --> shost
+    shost --> score["gateway-core"]
+  end
+  dcore -- "HTTP, SSE" --> eng["OpenCode engine"]
+  score -- "HTTP, SSE" --> eng
+</pre>
+<figcaption>One gateway core, two hosts. The UI and the adapter do not change between surfaces; only the transport does.</figcaption>
+</div>
+<ul>
+  <li><strong>Transport-neutral contracts.</strong> Define gateway calls and events as schemas in <code>@app/rpc-contracts</code>. MessagePort and WebSocket become two implementations of one channel interface.</li>
+  <li><strong>Authentication moves to the server.</strong> On the web, the browser logs in to <em>your</em> server, which holds the engine password. The browser never receives it, so C7 still holds. OpenChamber's UI password and the engine's pairing flow are the reference points.</li>
+  <li><strong>Extension assets need their own origin.</strong> Browsers have no <code>app-ext://</code> scheme. Serve extension files from a separate origin, such as a dedicated port or subdomain, so the sandbox and CSP model carries over unchanged.</li>
+  <li><strong>Mobile through Capacitor.</strong> Wrapping the web build keeps one React codebase and keeps iframe sandboxing for extensions. OpenChamber took the same route. React Native would give a more native feel, but it means a second UI and a different extension sandbox, so treat it as a later option rather than the plan.</li>
+  <li><strong>Platform-specific code stays behind interfaces.</strong> Notifications, file pickers, keychain and deep links go through a platform service with desktop, web and mobile implementations. Modules never call Electron or Capacitor directly.</li>
+</ul>
+
+<h3 id="s6-react">6.11 React implementation notes</h3>
+<p>Streaming deltas are the one place React needs care. A naive store re-renders the whole timeline on every token. These patterns keep updates local:</p>
+<ul>
+  <li><strong>Keep state outside React.</strong> The adapter writes to a plain store, normalized by id. Components subscribe through <code>useSyncExternalStore</code> with narrow selectors, so a delta to one text part re-renders only that part.</li>
+  <li><strong>Batch by frame.</strong> The gateway already batches events (upstream uses 10 ms, OpenChamber 50 ms). Apply each batch once per animation frame.</li>
+  <li><strong>Stream into a leaf.</strong> Render streaming text in a small component keyed by part id. Re-parse only the trailing Markdown block while it streams, and treat finished blocks as immutable.</li>
+  <li><strong>Virtualize long timelines</strong> with a windowing library such as TanStack Virtual, which OpenChamber uses.</li>
+  <li><strong>Keep fast-changing values out of context.</strong> Context suits rarely changing values like theme and the module context, not live session data.</li>
+</ul>
+<pre><code>// Subscribe one component to one timeline part; other parts never re-render.
+export function usePart(sessionId: SessionId, partId: PartId) {
+  return useSyncExternalStore(
+    (notify) =&gt; timeline.subscribe(sessionId, partId, notify),
+    () =&gt; timeline.part(sessionId, partId),
+  )
+}
+
+function StreamingText(props: { sessionId: SessionId; partId: PartId }) {
+  const part = usePart(props.sessionId, props.partId)
+  return &lt;Markdown source={part.text} streaming={part.state === "streaming"} /&gt;
+}</code></pre>
+</section>
+
+<!-- ============================== 7 ============================== -->
+<section id="s7">
+<h2 class="sec"><span class="num">07</span>Extension system proposal</h2>
+
+<h3>7.1 Trust tiers</h3>
+<p><span class="tag t-rec">Recommendation</span>Use one manifest format and one install flow, with separate trust tiers. The tier decides where code runs and what it can reach. Users see the tier before they install.</p>
+<div class="tbl wide"><table>
+<thead><tr><th>Tier</th><th>What it can contribute</th><th>Runs as</th><th>Isolation</th><th>Phase</th></tr></thead>
+<tbody>
+<tr><td><strong>T0 Declarative</strong></td><td>Themes, icon themes, keybindings, settings defaults, prompt templates and snippets, tool-call renderers, menu entries bound to existing commands, layout presets</td><td>Data validated by schema and interpreted by the host</td><td><span class="r good">No code runs</span></td><td>2</td></tr>
+<tr><td><strong>T1 Sandboxed</strong></td><td>Views (side, dock, page, dialog), background logic, commands, actions on messages, sessions and files, status items, slash-command resolvers, integrations with host-held credentials</td><td>Iframe with an opaque origin and a strict CSP, talking to an async API</td><td><span class="r good">Capabilities enforced in main</span></td><td>3</td></tr>
+<tr><td><strong>Engine plugin</strong></td><td>Agent tools, agents, provider and model transforms, session context hooks, RPC to the extension's GUI half</td><td>Inside the OpenCode engine</td><td><span class="r poor">Full engine privileges</span></td><td>4</td></tr>
+<tr><td><strong>T2 Trusted native</strong></td><td>Native components inside core surfaces such as timeline decorations and composer add-ons</td><td>In the renderer, on a vetted subset of the internal SDK</td><td><span class="r poor">Review only</span></td><td>Later, possibly never for third parties</td></tr>
+<tr><td><strong>T3 Privileged service</strong></td><td>Local processes with OS access: indexers, language tools, local bridges</td><td>Electron <code>utilityProcess</code> or a child process</td><td><span class="r poor">OS user only</span></td><td>5, verified publishers</td></tr>
+</tbody></table></div>
+<p>First-party feature modules are not a tier. They are compiled into the app, use the internal SDK, and are never distributed.</p>
+
+<h3>7.2 Manifest</h3>
+<p><span class="tag t-rec">Recommendation</span>Put the manifest in <code>package.json</code> so authors use npm tooling they know. <code>app</code> below stands for your product name.</p>
+<pre><code>{
+  "name": "@acme/tasks",
+  "version": "1.2.0",
+  "app": {
+    "apiVersion": 1,
+    "id": "acme.tasks",
+    "tier": "sandboxed",
+    "engines": { "app": "&gt;=0.6.0 &lt;1.0.0", "opencode": "&gt;=2.0.20 &lt;3.0.0" },
+    "activation": ["onCommand:acme.tasks.sync", "onView:acme.tasks"],
+    "capabilities": ["sessions:read", "network:api.acme.example", "storage"],
+    "contributes": {
+      "commands": [{ "id": "acme.tasks.sync", "title": "Sync tasks" }],
+      "keybindings": [{ "command": "acme.tasks.sync", "key": "mod+shift+t" }],
+      "views": [{ "id": "acme.tasks", "title": "Tasks", "region": "side", "entry": "view/index.html" }],
+      "toolRenderers": [{ "match": "mcp.acme.*", "title": "{input.id}", "body": "table", "columns": ["id", "title", "status"] }],
+      "settings": { "acme.tasks.project": { "type": "string", "description": "Project key" } },
+      "themes": [{ "id": "acme-dusk", "path": "themes/dusk.json" }]
+    },
+    "background": "background/index.js",
+    "enginePlugin": { "package": "@acme/opencode-tasks", "rpc": "acme.tasks", "range": "^1.0.0" }
+  }
+}</code></pre>
+<ul>
+  <li><code>id</code> is <code>publisher.name</code> and prefixes every contributed id, storage key and RPC name, the same discipline upstream uses for built-ins.</li>
+  <li><code>engines.opencode</code> is optional. Only extensions that call engine RPC or depend on engine-specific behavior need it.</li>
+  <li><code>enginePlugin</code> declares the agent-side half. The client never installs it silently. Section 7.12 covers how.</li>
+</ul>
+
+<h3>7.3 Discovery and loading</h3>
+<ol>
+  <li>Main scans three roots: bundled extensions, the user extensions directory under app data, and developer folders registered in developer mode.</li>
+  <li>It validates each manifest against the schema for its <code>apiVersion</code>, checks <code>engines</code>, and checks recorded file hashes for installed packages.</li>
+  <li>Declarative contributions are merged into the registries before the first frame. No code loads at this stage.</li>
+  <li>Code loads only when an activation event fires. Main serves package files from <code>app-ext://&lt;id&gt;/</code> with a per-extension CSP header. On the web, the gateway server serves them from a separate origin instead (6.10).</li>
+</ol>
+
+<h3>7.4 Activation and lifecycle</h3>
+<p>Activation events: <code>onCommand:&lt;id&gt;</code>, <code>onView:&lt;id&gt;</code>, <code>onAction:&lt;id&gt;</code>, <code>onEngineConnected</code>, <code>onSessionOpened</code>, <code>onToolCall:&lt;pattern&gt;</code>, <code>onUri</code>. There is no <code>onStartup</code> for third parties, because startup time is shared by everyone.</p>
+<div class="figure">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Installed: package verified
+  Installed --> AwaitingGrant: capabilities requested
+  Installed --> Enabled: no capabilities requested
+  AwaitingGrant --> Enabled: user approves
+  Enabled --> Dormant: waiting for activation event
+  Dormant --> Activating: activation event
+  Activating --> Active: setup settled
+  Activating --> Failed: setup threw or timed out
+  Active --> Blocked: required dependency unavailable
+  Blocked --> Activating: dependency returns
+  Active --> Failed: repeated faults
+  Failed --> Activating: user retries
+  Active --> Disabled: user disables
+  Disabled --> Dormant: user enables
+  Active --> AwaitingGrant: update requests new capabilities
+  Disabled --> [*]: uninstalled
+</pre>
+<figcaption>Extension lifecycle. An update that widens capabilities returns to AwaitingGrant and never inherits approval.</figcaption>
+</div>
+
+<h3>7.5 Public API and contribution points</h3>
+<pre><code>// @app/extension-api, apiVersion 1. Async, serializable, capability-gated. No framework types.
+import { defineExtension } from "@app/extension-api"
+
+export default defineExtension(async (host) =&gt; {
+  host.commands.register("acme.tasks.sync", async () =&gt; {
+    const session = await host.sessions.current()          // "sessions:read"
+    if (!session) return host.notify({ kind: "info", message: "Open a session first" })
+    const response = await host.network.fetch("https://api.acme.example/tasks") // "network:api.acme.example"
+    await host.views.post("acme.tasks", { tasks: await response.json() })
+  })
+
+  host.events.on("session.activity", (event) =&gt; {
+    if (event.status === "idle") host.views.post("acme.tasks", { refresh: event.sessionId })
+  })
+
+  if (host.capabilities.has("engine.rpc:acme.tasks")) {
+    const open = await host.engine.rpc("acme.tasks", "listOpen", {})   // forwards to POST /api/rpc/{id}/{method}
+    host.status.set("acme.tasks", { text: `${open.length} open` })
+  }
+})</code></pre>
+<div class="tbl wide"><table>
+<thead><tr><th>Contribution</th><th>Tier</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Themes, icon themes</td><td>T0</td><td>DesktopTheme-compatible JSON; VS Code theme import</td></tr>
+<tr><td>Keybindings</td><td>T0</td><td>Bind only to known command ids; conflicts shown in settings</td></tr>
+<tr><td>Settings schema</td><td>T0</td><td>Rendered by the settings module; values read through the API</td></tr>
+<tr><td>Prompt templates and snippets</td><td>T0</td><td>Inserted into the composer by the user; never sent automatically</td></tr>
+<tr><td>Tool-call renderers</td><td>T0</td><td>Template-based, capped; matched by tool name</td></tr>
+<tr><td>Menu items</td><td>T0 or T1</td><td>Point at commands; placement by named menu id</td></tr>
+<tr><td>Commands</td><td>T1</td><td>Handler runs in the extension's background frame</td></tr>
+<tr><td>Views</td><td>T1</td><td>Side, dock, page or dialog; iframe in a host-drawn frame with the extension's name</td></tr>
+<tr><td>Actions on messages, sessions and files</td><td>T1</td><td>Item passed as data; payload size capped</td></tr>
+<tr><td>Status items</td><td>T1</td><td>Text, icon and command only</td></tr>
+<tr><td>Integrations</td><td>T1</td><td>Token or OAuth held by main; host-proxied requests to one declared origin</td></tr>
+<tr><td>Engine RPC bridge</td><td>T1 plus engine plugin</td><td>Only to the extension's own declared RPC id</td></tr>
+<tr><td>Timeline decorations, composer add-ons</td><td>T2</td><td>Deferred</td></tr>
+<tr><td>Local services</td><td>T3</td><td>Deferred</td></tr>
+</tbody></table></div>
+
+<h3>7.6 Capabilities and permissions</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Capability</th><th>Allows</th><th>Risk</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td><code>storage</code></td><td>Own namespaced storage</td><td><span class="r good">Low</span></td><td>Quota-bound, own data only</td></tr>
+<tr><td><code>notifications</code></td><td>Toasts and OS notifications</td><td><span class="r good">Low</span></td><td>Rate-limited</td></tr>
+<tr><td><code>clipboard:write</code></td><td>Copy text</td><td><span class="r good">Low</span></td><td>Only during a user gesture</td></tr>
+<tr><td><code>sessions:read</code></td><td>List sessions and metadata</td><td><span class="r mixed">Medium</span></td><td>Reveals project names and titles</td></tr>
+<tr><td><code>model:generate</code></td><td>One-off generation with the user's small model</td><td><span class="r mixed">Medium</span></td><td>Costs money; rate-limited</td></tr>
+<tr><td><code>conversation:read</code></td><td>Message content and tool output</td><td><span class="r poor">High</span></td><td>Transcripts contain code and secrets</td></tr>
+<tr><td><code>files:read</code></td><td>Read inside the open project, through the engine's fs routes</td><td><span class="r poor">High</span></td><td>Source code and <code>.env</code> files</td></tr>
+<tr><td><code>network:&lt;origin&gt;</code></td><td>Host-proxied requests to one origin</td><td><span class="r poor">High with any read capability</span></td><td>The exfiltration path</td></tr>
+<tr><td><code>sessions:create</code></td><td>Create sessions or worktrees</td><td><span class="r poor">High</span></td><td>Starts agent work</td></tr>
+<tr><td><code>prompt:send</code></td><td>Send input to a session</td><td><span class="r poor">Critical</span></td><td>The agent can run shell commands within the user's permission rules. Sending a prompt is indirect code execution.</td></tr>
+<tr><td><code>engine.rpc:&lt;id&gt;</code></td><td>Call its own engine plugin</td><td><span class="r poor">As high as the plugin</span></td><td>The plugin runs inside the engine</td></tr>
+</tbody></table></div>
+<ul>
+  <li><span class="tag t-rec">Recommendation</span>Show combinations, not lists. "Can read your conversations and send data to api.acme.example" is a sentence a user can judge. Five separate checkboxes are not.</li>
+  <li><span class="tag t-rec">Recommendation</span><code>prompt:send</code> always asks per use unless the user grants standing approval for that extension and that session. The prompt is shown in a host-drawn dialog the extension cannot style.</li>
+  <li><span class="tag t-rec">Recommendation</span>Never exposed to any tier: permission replies and rule changes, engine credentials, raw engine HTTP, credential and integration management, config writes, other extensions' storage.</li>
+</ul>
+
+<h3>7.7 Dependencies and compatibility</h3>
+<ul>
+  <li><span class="tag t-rec">Recommendation</span>In Phase 3, support no inter-extension dependencies. Extensions share functionality through commands, which are already public and late-bound.</li>
+  <li>When demand appears, add <code>requires</code> and <code>uses</code> with upstream's semantics: a missing required provider blocks the extension, a missing optional provider degrades it. Resolve with semver ranges, activate in topological order, and reject cycles at install.</li>
+  <li>Compatibility is checked at install and at every app or engine version change. An incompatible extension is disabled with an explanation, never half-loaded.</li>
+</ul>
+
+<h3>7.8 Storage and scoped settings</h3>
+<ul>
+  <li>Storage scopes are <code>global</code>, <code>project</code> (keyed by the engine's project id) and <code>session</code>. Starting quotas can follow OpenChamber's tested limits: 64 KiB per value and 2 MiB per namespace.</li>
+  <li><code>host.secrets</code> stores per-extension secrets in the OS keychain through main.</li>
+  <li>Settings come from the contributed schema, are edited in the settings UI, and are read with <code>host.settings.get</code> and <code>onChange</code>. An extension can never read another extension's namespace.</li>
+  <li>Data survives disable and update. Uninstall removes it after a grace period unless the user chooses to purge it.</li>
+</ul>
+
+<h3>7.9 Error isolation and crash handling</h3>
+<ul>
+  <li>A failing view affects only its frame. The host draws the frame and shows an error state inside it.</li>
+  <li>Every API call has a timeout. A background invocation has a total time limit (OpenChamber uses 20 s).</li>
+  <li>A contribution that throws renders nothing and records the error, which is upstream's rule for built-ins.</li>
+  <li>Repeated faults disable the extension automatically and tell the user why.</li>
+  <li>A safe-mode launch flag disables every non-bundled extension. It is the recovery path when an extension breaks startup.</li>
+  <li>The extension manager shows per-extension logs, the last error, activation time and memory.</li>
+</ul>
+
+<h3>7.10 Sandbox implementation in Electron</h3>
+<ul>
+  <li>Windows run with <code>sandbox: true</code>, <code>contextIsolation: true</code> and no Node integration, as upstream's desktop does.</li>
+  <li>Extension frames use <code>sandbox="allow-scripts"</code> without <code>allow-same-origin</code>. That gives them an opaque origin with no access to the parent DOM, cookies or storage.</li>
+  <li>Files are served from <code>app-ext://&lt;id&gt;/</code> with <code>default-src 'none'</code>, scripts and styles limited to the package, and <code>connect-src 'none'</code>. All input and output goes through the host bridge.</li>
+  <li>Main denies navigation, new windows and all device permission requests that come from extension frames.</li>
+  <li><span class="tag t-open">Open question</span>Whether Electron's site isolation puts these opaque-origin frames in separate renderer processes needs a measurement in the prototype. If they share the host's process, a renderer exploit in an extension frame reaches the host. The fallback is a <code>WebContentsView</code> per untrusted extension, at a higher memory cost.</li>
+</ul>
+
+<h3>7.11 Implementation mechanisms compared</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Mechanism</th><th>Isolation</th><th>UI</th><th>Cost</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>Declarative manifests</td><td><span class="r good">Total</span></td><td>Host-rendered</td><td>Minimal</td><td><span class="r good">Use first</span></td></tr>
+<tr><td>Statically bundled modules</td><td>None</td><td>Native</td><td>Minimal</td><td><span class="r good">First-party only</span></td></tr>
+<tr><td>Dynamically loaded in-process code (the <code>.ocdx</code> approach)</td><td><span class="r poor">None</span></td><td>Native</td><td>Low</td><td><span class="r mixed">Trusted tier or developer mode only</span></td></tr>
+<tr><td>Web Workers</td><td><span class="r mixed">Same origin as the host unless created inside a sandboxed frame</span></td><td>None</td><td>Low</td><td><span class="r mixed">Not needed; a hidden sandboxed frame covers background logic with one mechanism</span></td></tr>
+<tr><td>Sandboxed iframes</td><td><span class="r good">Opaque origin plus CSP</span></td><td>Inside a frame</td><td>One document per view</td><td><span class="r good">Default for third-party code</span></td></tr>
+<tr><td><code>WebContentsView</code> per extension</td><td><span class="r good">Separate process</span></td><td>Inside a native view</td><td>High memory</td><td><span class="r mixed">Fallback if frame isolation proves weak; also for web embeds</span></td></tr>
+<tr><td><code>utilityProcess</code> or child process</td><td><span class="r mixed">OS user</span></td><td>None</td><td>Medium</td><td><span class="r mixed">T3 services only</span></td></tr>
+<tr><td>WASM JavaScript interpreter (for example QuickJS)</td><td><span class="r good">Strong</span></td><td>None</td><td>High complexity</td><td><span class="r poor">Rejected; solves a problem iframes already solve</span></td></tr>
+</tbody></table></div>
+
+<h3>7.12 Threats specific to an agent client</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Threat</th><th>Example</th><th>Control</th></tr></thead>
+<tbody>
+<tr><td>Indirect code execution</td><td>An extension sends "run <code>curl … | sh</code>" to a session with permissive rules</td><td><code>prompt:send</code> is critical, confirmed per use, shown verbatim in host chrome</td></tr>
+<tr><td>Approval hijack</td><td>An extension answers <code>permission.asked</code> with "always"</td><td>Permission replies are never in the API; the credential never leaves main</td></tr>
+<tr><td>Exfiltration</td><td>Read transcripts, post them to a remote server</td><td>CSP blocks direct network access; host proxy limited to declared origins; combined-risk wording at install</td></tr>
+<tr><td>Prompt injection into extensions</td><td>Tool output instructs an extension's own model call to act</td><td>No extension gets autonomous <code>prompt:send</code>; <code>model:generate</code> output is data only</td></tr>
+<tr><td>UI spoofing</td><td>A view draws a fake permission dialog</td><td>Sensitive dialogs are host-drawn outside frames; frames carry the extension's name</td></tr>
+<tr><td>Supply chain</td><td>An update adds malicious code after approval</td><td>Hashes recorded at install; widened capabilities need re-approval; signed packages in Phase 5</td></tr>
+<tr><td>Engine plugin abuse</td><td>A companion plugin adds a tool that reads <code>~/.ssh</code></td><td>Plugin install is a separate, explicit, T3-level consent; the client never edits engine config silently</td></tr>
+<tr><td>Archive attacks</td><td>Path traversal, zip bombs</td><td>Copy upstream's archive rules: relative paths only, 100 MiB and 4,096-entry limits, 64 KiB manifest cap (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/extension/archive.ts">desktop/src/main/extension/archive.ts</a>)</td></tr>
+</tbody></table></div>
+<p><span class="tag t-dec">Decided</span>The engine has no plugin install endpoint. When an extension declares a companion engine plugin, the client shows the exact <code>plugins</code> entry with buttons to copy it and to open the user's OpenCode config. It then confirms the plugin loaded through <code>GET /api/plugin</code>. The client never edits engine config on its own. If upstream adds an install endpoint, use it behind a capability flag.</p>
+
+<h3>7.13 Install, update, removal and rollback</h3>
+<ul>
+  <li><strong>Package:</strong> a zip with <code>package.json</code> at the root and built files only. Validate it before it replaces anything.</li>
+  <li><strong>Layout:</strong> <code>extensions/&lt;id&gt;/&lt;version&gt;/</code>, with the current version recorded in the client database. Keep the previous version.</li>
+  <li><strong>Update:</strong> download, validate, compare capabilities, ask for approval if they widened, switch the version pointer atomically, then reactivate.</li>
+  <li><strong>Rollback:</strong> switch the pointer back. Data is untouched, because storage is keyed by id, not version.</li>
+  <li><strong>Removal:</strong> deactivate, delete files, schedule data deletion.</li>
+  <li><strong>Sources:</strong> local folder (developer mode, hot reload), zip file, URL, then index entries.</li>
+</ul>
+
+<h3>7.14 Distribution, staged</h3>
+<ol>
+  <li><strong>Local:</strong> folder and zip installs, plus a developer mode that reloads on change.</li>
+  <li><strong>Curated index:</strong> a public git repository of JSON entries with id, versions, download URL, SHA-256 and publisher. Changes arrive by pull request with review. This is cheap to run and leaves an audit trail.</li>
+  <li><strong>Hosted registry:</strong> publisher accounts, signing, automated scanning, yank and deprecation, abuse reports and download counts. Open VSX is a reference for running a neutral registry.</li>
+</ol>
+</section>
+
+<!-- ============================== 8 ============================== -->
+<section id="s8">
+<h2 class="sec"><span class="num">08</span>OpenCode compatibility and upgrade strategy</h2>
+
+<h3>8.1 What the adapter contains</h3>
+<ul>
+  <li>The only imports of <code>@opencode/client</code> and <code>@opencode/schema</code> in the codebase.</li>
+  <li>Domain mapping for reads and writes, and pure event translation.</li>
+  <li>Capability flags and version shims, so every "if the engine is older than X" decision lives in one file.</li>
+  <li>Contract fixtures for each supported engine version.</li>
+</ul>
+
+<h3>8.2 Detecting version and capabilities</h3>
+<ol>
+  <li><code>GET /api/info</code>: read <code>version</code> and <code>capabilities</code>. A 404 means an incompatible protocol, as in the client's own probe.</li>
+  <li><code>GET /openapi.json</code>, cached per version: derive which operation ids and request fields exist.</li>
+  <li>Compute <code>EngineCapabilities</code> and the support state (supported, untested or unsupported) against the declared range.</li>
+  <li>Publish capabilities to the store. Modules and the extension API read flags. They never compare version strings.</li>
+</ol>
+
+<h3>8.3 Supported range</h3>
+<p><span class="tag t-rec">Recommendation</span>Start with <code>&gt;=2.0.20 &lt;2.1.0</code>. The floor matches OpenChamber's tested floor, and everything after it has been additive (2.10). Patch versions newer than the latest one you tested run with an "untested engine" notice, and features whose capabilities are missing stay off. Raise the floor deliberately, never by accident.</p>
+
+<h3>8.4 Handling change</h3>
+<ul>
+  <li><strong>Reads:</strong> decode leniently. Ignore unknown fields, map unknown enum values to an <code>unknown</code> variant, and count unknown event types.</li>
+  <li><strong>Writes:</strong> send a field only when the connected engine's schema declares it, because bodies reject unknown fields.</li>
+  <li><strong>Experimental routes:</strong> behind feature flags that are off by default. Never exposed through the public extension API.</li>
+  <li><strong>Deprecations:</strong> shims in the adapter, with a removal date tied to raising the supported floor.</li>
+  <li><strong>New engine features:</strong> added behind a capability flag first, so older engines keep working.</li>
+</ul>
+
+<h3>8.5 Never rely on</h3>
+<ul>
+  <li>The engine database, its tables or its migration state. OpenChamber's <code>kv</code> write is the cautionary example.</li>
+  <li>CLI-private files other than the registration file read through <code>@opencode/client/service</code>.</li>
+  <li>Data-directory layout, such as worktree paths.</li>
+  <li>Event ordering beyond the per-aggregate <code>seq</code> of durable events, or the size of streaming deltas.</li>
+  <li>Error message text. Use the typed error tags.</li>
+  <li>Timing, such as how long lazy directory initialization takes.</li>
+  <li><code>@opencode/client/solid</code> internals, the private <code>gui-extensions</code> SDK, or the official desktop's IPC.</li>
+</ul>
+
+<h3>8.6 Living beside the official clients</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Situation</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td>Shared service running, version supported</td><td>Join it</td></tr>
+<tr><td>Running, newer than tested, same minor</td><td>Join, show "untested engine version", keep missing capabilities off</td></tr>
+<tr><td>Running, below the floor</td><td>Do not replace it. Show Incompatible with clear actions. If the installed CLI is newer than the running service (the user upgraded but the old service is still up), offer to restart the service with it, with consent and a warning that other clients will reconnect. Otherwise show how to update OpenCode.</td></tr>
+<tr><td>Not running, OpenCode installed</td><td>Call <code>ensure()</code> with no version, so the user's own CLI starts the shared service</td></tr>
+<tr><td>Not running, not installed</td><td><span class="tag t-dec">Decided</span>No bundled binary. Look for <code>opencode</code> on <code>PATH</code> and in common install locations, show the official install options, and check again when the window regains focus.</td></tr>
+<tr><td>Installed CLI below the floor</td><td>Show the installed version, the minimum required, and how to update. Read-only browsing of an already-running compatible service still works.</td></tr>
+<tr><td>Registration replaced while connected</td><td>Another client restarted the service. Go back through discovery and recheck the version.</td></tr>
+<tr><td>Isolated mode</td><td>Run <code>opencode serve</code> without <code>--service</code>, on a loopback port, with <code>OPENCODE_PASSWORD</code> set (<a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/env.ts">cli/src/env.ts</a>) and a separate <code>OPENCODE_DB</code>. Sessions there are not visible to other clients.</td></tr>
+<tr><td>Remote server</td><td>Pair by link or QR code; store the token in the keychain</td></tr>
+<tr><td>Official app with auto-approve on</td><td>It may answer permission requests before your UI shows them. Show requests closed by another client as such, not as errors.</td></tr>
+</tbody></table></div>
+
+<h3>8.7 Keeping extensions working across engine upgrades</h3>
+<ul>
+  <li>The public API speaks the client domain model, so a wire change touches only the adapter.</li>
+  <li>Extensions ask <code>host.capabilities.has(...)</code> instead of checking engine versions.</li>
+  <li>Only extensions with an engine plugin declare <code>engines.opencode</code>, and that range is checked against the connected engine on every connect.</li>
+</ul>
+
+<h3>8.8 Official engine or fork</h3>
+<p><span class="tag t-rec">Recommendation</span>Use the official engine. Fork only when all three of these hold: a capability is essential to the core product, it cannot be built as an engine plugin, and upstream has declined it. If you fork, keep it as a small patch queue on top of release tags. The repository's own <code>patches/</code> directory shows the style. Rebase on every release you support, and never change the wire protocol in the fork.</p>
+<p><span class="tag t-dec">Decided</span>Open upstream issues for four things that would remove most of this document's workarounds. Design so that none of them is required, and adopt each one behind a capability flag if it ships:</p>
+<ul>
+  <li>Event replay with a cursor (<code>Last-Event-ID</code>, or <code>after</code> for durable events).</li>
+  <li>An explicit API version or capability list in <code>/api/info</code>.</li>
+  <li>A plugin install endpoint.</li>
+  <li>A documented way for third-party clients to identify themselves.</li>
+</ul>
+
+<h3>8.9 Stable contracts and implementation details</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Treat as a stable contract</th><th>Treat as an implementation detail</th></tr></thead>
+<tbody>
+<tr><td>Audited <em>Keep</em> and <em>Change</em> endpoints and their OpenAPI schemas</td><td><code>/api/experimental/*</code></td></tr>
+<tr><td>Event types in <code>EventManifest.ServerDefinitions</code></td><td>Delta granularity and timing</td></tr>
+<tr><td>Registration file through <code>@opencode/client/service</code></td><td>The CLI's other files and flags</td></tr>
+<tr><td>Basic auth, pairing tokens</td><td>CORS allowlist specifics</td></tr>
+<tr><td>Plugin RPC route and <code>rpc.*</code> events</td><td>Engine database and data directory</td></tr>
+<tr><td><code>@opencode/plugin</code> for engine plugins, versioned with the engine</td><td><code>@opencode/client/solid</code>, <code>gui-extensions</code>, desktop IPC</td></tr>
+<tr><td>Your own: <code>@app/extension-api</code>, manifest schema, theme format</td><td>Your own: <code>@app/sdk</code>, core internals, IPC contracts</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================== 9 ============================== -->
+<section id="s9">
+<h2 class="sec"><span class="num">09</span>Testing and validation strategy</h2>
+<div class="tbl wide"><table>
+<thead><tr><th>Level</th><th>What it proves</th><th>How</th></tr></thead>
+<tbody>
+<tr><td>Unit</td><td>Pure logic is correct</td><td>Adapter projections and event translation, reducers, keybinding resolution, settings layering, manifest validation, capability decisions</td></tr>
+<tr><td>Adapter contract</td><td>The adapter matches each supported engine version</td><td>Golden fixtures of real responses and event streams per version; validate every request the adapter can build against that version's <code>openapi.json</code></td></tr>
+<tr><td>Engine integration</td><td>Real engine behavior: admission, streaming, permissions, resync</td><td>Spawn pinned <code>opencode</code> binaries with temporary XDG directories and <code>OPENCODE_DB</code>; or run <code>@opencode/sdk</code> in-process with an in-memory database; drive deterministic turns with <code>@opencode/simulation</code>'s simulated provider (API to confirm)</td></tr>
+<tr><td>Resilience</td><td>Correctness under the stream's failure modes</td><td>Kill the engine mid-turn, drop the network, throttle the consumer until the 4,096-event queue overflows, replace the registration with another version</td></tr>
+<tr><td>End to end</td><td>Critical desktop workflows</td><td>Playwright's Electron support: connect, create session, prompt, approve permission, reconnect, install, enable and disable an extension, safe mode</td></tr>
+<tr><td>Extension API compatibility</td><td>Public API changes are intentional</td><td>API Extractor report in review; type tests; a corpus of sample extensions run on every release; boot with each optional provider disabled, like upstream's graph matrix</td></tr>
+<tr><td>Security</td><td>Capabilities hold</td><td>Denied calls fail with <code>NOT_GRANTED</code>; frames cannot fetch, navigate or reach the parent; spoofed postMessage sources are rejected; archive traversal and size limits; storage quotas</td></tr>
+<tr><td>Engine upgrade regression</td><td>New releases do not break you silently</td><td>Nightly matrix of floor, latest release and upstream <code>v2</code> HEAD; diff <code>openapi.json</code> and the event manifest between tags (the method used in 2.10) and alert on removals</td></tr>
+<tr><td>Extension development</td><td>Authors can test without the full app</td><td>A headless host harness implementing <code>@app/extension-api</code> with fixtures, plus developer mode with hot reload in the app</td></tr>
+</tbody></table></div>
+
+<h3>Smallest useful prototype</h3>
+<p><span class="tag t-rec">Recommendation</span>Build a walking skeleton that settles the decisions that are hardest to reverse, before any product work. It passes when every item below holds.</p>
+<ul>
+  <li><strong>P1 Coexistence.</strong> With the official desktop running, the prototype joins the shared service without replacing it, and survives the official app replacing the service.</li>
+  <li><strong>P2 Resync.</strong> A forced queue overflow and a killed engine both end with a timeline identical to a fresh load.</li>
+  <li><strong>P3 Transport.</strong> The typed client in the renderer works through the IPC-backed fetch. The password is absent from renderer memory, and two windows share one upstream stream.</li>
+  <li><strong>P4 Adapter.</strong> One session timeline renders from snapshot plus deltas. A prompt retried with the same <code>msg_</code> id is admitted once.</li>
+  <li><strong>P5 Module boundary.</strong> Two first-party modules communicate through a contract. Lint rejects a forbidden import.</li>
+  <li><strong>P6 Sandbox.</strong> One third-party view, one command and one declarative tool renderer work. A denied capability fails cleanly. RPC latency, per-frame memory and process placement are measured.</li>
+  <li><strong>P7 Versions.</strong> The same build passes contract tests against OpenCode 2.0.20 and 2.0.26.</li>
+  <li><strong>P8 Portability.</strong> <code>@app/gateway-core</code> passes its tests under plain Node with no Electron, and one React view renders a live session timeline without dropping frames while tokens stream.</li>
+</ul>
+</section>
+
+<!-- ============================== 10 ============================== -->
+<section id="s10">
+<h2 class="sec"><span class="num">10</span>Risks and unresolved questions</h2>
+<div class="tbl wide"><table>
+<thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>Upstream opens the official desktop to third-party GUI extensions, competing with your ecosystem (A7)</td><td><span class="r mixed">Medium</span></td><td><span class="r poor">High</span></td><td>Watch <code>packages/desktop/src/main/extension</code>; differentiate on safety and customization; keep manifest concepts close enough to port</td></tr>
+<tr><td>Engine API churn returns (a 2.1 or 3.0 redesign)</td><td><span class="r mixed">Medium</span></td><td><span class="r poor">High</span></td><td>Adapter, capability flags, nightly matrix, declared range</td></tr>
+<tr><td>Event loss produces wrong state</td><td><span class="r mixed">Medium</span></td><td><span class="r poor">High</span></td><td>Snapshot-first design, resync on every reconnect, durable sequence gap checks, resilience tests</td></tr>
+<tr><td>Version war with official clients over the shared service</td><td><span class="r mixed">Medium</span></td><td><span class="r mixed">Medium</span></td><td>Join-never-replace policy; explicit consent to restart</td></tr>
+<tr><td>Two engines on one database (if isolation is skipped)</td><td><span class="r mixed">Low with policy</span></td><td><span class="r poor">High</span></td><td>C4; isolated mode always sets <code>OPENCODE_DB</code></td></tr>
+<tr><td>Effect 4 release-candidate churn through <code>@opencode/schema</code></td><td><span class="r mixed">Medium</span></td><td><span class="r mixed">Medium</span></td><td>Use only the Promise client root; keep Effect out of your public API</td></tr>
+<tr><td>Iframe isolation weaker than assumed (A5)</td><td><span class="r mixed">Low</span></td><td><span class="r poor">High</span></td><td>Measure in P6; <code>WebContentsView</code> fallback</td></tr>
+<tr><td>Public API too thin to attract authors (A6)</td><td><span class="r mixed">Medium</span></td><td><span class="r mixed">Medium</span></td><td>Build first-party features on the module system so missing contribution points surface early; add a T2 tier for vetted publishers</td></tr>
+<tr><td>Malicious or compromised extension</td><td><span class="r mixed">Medium once popular</span></td><td><span class="r poor">High</span></td><td>Capabilities, hashes, re-approval, signing, curated index, safe mode, kill switch in the index</td></tr>
+<tr><td>Release cadence outpaces your testing (27 releases in 27 days)</td><td><span class="r poor">High</span></td><td><span class="r mixed">Medium</span></td><td>Untested state instead of blocking; automated nightly matrix</td></tr>
+<tr><td>Users run an OpenCode version outside your range, since you do not bundle one</td><td><span class="r poor">High</span></td><td><span class="r mixed">Medium</span></td><td>Clear version screen with update steps; capability flags instead of a hard block where safe</td></tr>
+<tr><td>React re-renders make streaming janky</td><td><span class="r mixed">Medium</span></td><td><span class="r mixed">Medium</span></td><td>External store with selectors, frame batching, virtualization (6.11); measured in P8</td></tr>
+<tr><td>A later web host exposes agent control over the network</td><td><span class="r mixed">Medium</span></td><td><span class="r poor">High</span></td><td>Loopback by default, server-side login, engine password never sent to browsers, security review before shipping web</td></tr>
+</tbody></table></div>
+
+<h3>Decisions</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Question</th><th>Decision</th><th>What it changes</th></tr></thead>
+<tbody>
+<tr><td>Desktop only, or also web and mobile?</td><td><span class="tag t-dec">Decided</span>Desktop first, web and mobile after it works</td><td>Host-neutral gateway core from day one (C11, 6.10); web and mobile as a later roadmap track</td></tr>
+<tr><td>Bundle OpenCode, or require an install?</td><td><span class="tag t-dec">Decided</span>Users install it</td><td>A supported range instead of one pinned version; detection and update guidance (8.6)</td></tr>
+<tr><td>Host UI framework</td><td><span class="tag t-dec">Decided</span>React</td><td>No reuse of <code>@opencode/ui</code>; explicit lifetimes and streaming patterns (6.6, 6.11); ADR-006</td></tr>
+<tr><td>Who runs the registry</td><td><span class="tag t-dec">Decided, on recommendation</span>A curated git index you maintain, then a hosted registry if the ecosystem grows</td><td>ADR-013; review rules written before the index opens</td></tr>
+<tr><td>Companion engine plugin installs</td><td><span class="tag t-dec">Decided</span>Show the config line, verify with <code>GET /api/plugin</code></td><td>No writes to engine config (7.12)</td></tr>
+<tr><td>Contribute upstream?</td><td><span class="tag t-dec">Decided, on recommendation</span>Open issues for the four asks in 8.8; never block on them</td><td>Each improvement adopted behind a capability flag</td></tr>
+<tr><td>Product name and branding</td><td><span class="tag t-rec">Recommendation</span>Mortise, alternate Binnacle</td><td>Section <a href="#s13">13</a>; formal trademark and domain checks still needed</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================== 11 ============================== -->
+<section id="s11">
+<h2 class="sec"><span class="num">11</span>Implementation roadmap</h2>
+<div class="tbl wide"><table>
+<thead><tr><th>Phase</th><th>Goal</th><th>Scope</th><th>Exit criteria</th></tr></thead>
+<tbody>
+<tr><td><strong>0 Validate</strong></td><td>Settle the irreversible decisions</td><td>The walking skeleton from section 9</td><td>P1 to P7 pass; ADRs confirmed or revised</td></tr>
+<tr><td><strong>1 Minimal client</strong></td><td>A daily-drivable client</td><td>Connection management, session list, timeline, composer, permissions and forms, review and diff, terminal, settings, command palette, keybindings, built-in themes, diagnostics. All of it as first-party modules.</td><td>Used daily by the team; contract tests on two engine versions; no forbidden imports</td></tr>
+<tr><td><strong>2 Customization</strong></td><td>Declarative tier goes public</td><td>User themes and VS Code import, keybindings, layouts, settings, prompt templates, tool renderers; local install of declarative packages; safe mode</td><td>Ten or more community-style declarative packages built by you; schemas versioned and documented</td></tr>
+<tr><td><strong>3 Sandboxed extensions</strong></td><td>Public API v1 preview</td><td>Views, background logic, commands, actions, status items, storage, capability approval, developer mode, test harness, docs and samples, API report</td><td>Five sample extensions; security suite green; API frozen for v1</td></tr>
+<tr><td><strong>4 Agent integrations</strong></td><td>Extensions with an engine half</td><td>Companion engine plugin pattern over plugin RPC, host-held integration credentials, network capability, workflow automation built from commands and session events (with <code>prompt:send</code> confirmation)</td><td>One integration end to end, such as an issue tracker with an MCP or plugin tool plus a panel</td></tr>
+<tr><td><strong>5 Ecosystem</strong></td><td>Distribution at scale</td><td>Curated index, then registry; signing; update channels; rollback UI; publisher verification; yank; optional T2 and T3 for verified publishers</td><td>Third-party publishers shipping updates without your help</td></tr>
+<tr><td><strong>W Web, then mobile</strong></td><td>Same product on more surfaces</td><td>A <code>gateway-server</code> host with its own login, the web build of the same React UI, extension assets on a separate origin, then a Capacitor mobile shell. Runs as a parallel track once Phase 1 is stable.</td><td>The desktop's contract and end-to-end suites pass through the server host; security review of remote access done</td></tr>
+</tbody></table></div>
+<p><span class="tag t-rec">Recommendation</span>Review two decisions at every phase boundary. Has upstream shipped third-party GUI extensions (A7)? Has the engine API changed shape (A1)? Either one can change the plan.</p>
+</section>
+
+<!-- ============================== 12 ============================== -->
+<section id="s12">
+<h2 class="sec"><span class="num">12</span>Architecture decision records</h2>
+
+<article class="adr"><header><span class="id">ADR-001</span><h4>Integrate only through public engine interfaces</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>The engine changes fast, and an audited public HTTP contract exists. Engine storage and CLI files are internal, and OpenChamber shows the cost of depending on them.</dd>
+<dt>Decision</dt><dd>Use only the HTTP API, SSE, PTY sockets, plugin RPC, the registration file through <code>@opencode/client/service</code>, and published packages. No fork.</dd>
+<dt>Alternatives</dt><dd>Fork the engine. Embed the engine through <code>@opencode/sdk</code>. Read engine storage directly.</dd>
+<dt>Consequences</dt><dd>Some features wait for upstream. Upgrades stay cheap, and you never risk user data.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-002</span><h4>Join the shared service; never replace it unasked</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>One service per user; official clients replace other versions; two engines on one database are likely unsafe.</dd>
+<dt>Decision</dt><dd>Discover and join without a version pin. Start the service with the user's installed CLI only when none is running. Ship no engine binary. Restart only with consent. Isolated mode always uses its own database.</dd>
+<dt>Alternatives</dt><dd>Always spawn a private engine (OpenChamber). Pin and replace (the official desktop). Bundle a CLI.</dd>
+<dt>Consequences</dt><dd>You must support a version range and handle engines you did not choose. Sessions are shared with the TUI and the official app.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-003</span><h4>Engine gateway in the Electron main process</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Credentials must stay out of renderers. CORS refuses custom schemes. Several windows would multiply SSE subscriptions and the risk of overflow.</dd>
+<dt>Decision</dt><dd>Main owns discovery, credentials, one stream per server and request forwarding, with no domain logic. The logic lives in <code>@app/gateway-core</code>, which imports no Electron, so a Node server can host it for web and mobile.</dd>
+<dt>Alternatives</dt><dd>Renderer connects directly. A separate local server process from the start (OpenChamber).</dd>
+<dt>Consequences</dt><dd>One extra IPC hop per request. A little discipline now; no gateway rewrite when web and mobile arrive.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-004</span><h4>Adapter package as the only OpenCode-aware code</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Wire shapes change across releases. Features and extensions must not change with them.</dd>
+<dt>Decision</dt><dd><code>@app/engine-opencode</code> alone imports <code>@opencode/*</code>, maps to a client-owned domain model and exposes capability flags.</dd>
+<dt>Alternatives</dt><dd>Use generated types everywhere. Depend on <code>@opencode/client/solid</code> as the store.</dd>
+<dt>Consequences</dt><dd>A mapping layer to maintain. Engine upgrades touch one package.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-005</span><h4>Electron for the desktop shell</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Service discovery ships as Node code. Extensions need a consistent web platform. Upstream and OpenChamber both use Electron.</dd>
+<dt>Decision</dt><dd>Electron, with sandboxed renderers and <code>utilityProcess</code> available for later tiers.</dd>
+<dt>Alternatives</dt><dd>Tauri: smaller, but discovery would need porting or a sidecar, and system webviews differ across platforms.</dd>
+<dt>Consequences</dt><dd>Larger binaries and memory. One rendering engine for every extension author.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-006</span><h4>React for the host UI; framework-neutral extension API</h4><span class="status">Decided</span></header><dl>
+<dt>Context</dt><dd>Solid's advantages here were reuse of upstream's Solid packages and fine-grained updates for streaming. The first is small, because this design already avoids depending on <code>@opencode/client/solid</code> and treats <code>@opencode/ui</code> as optional. The second has known React solutions. The owner prefers React, and web and mobile are planned.</dd>
+<dt>Decision</dt><dd>React for first-party code. The public extension API exposes no framework types, so third-party authors can use anything inside their frames.</dd>
+<dt>Alternatives</dt><dd>Solid, closer to upstream's code and cheaper per streamed token.</dd>
+<dt>Consequences</dt><dd>Your own design system instead of <code>@opencode/ui</code>. Explicit module lifetimes and streaming patterns (6.6, 6.11). A larger contributor pool, OpenChamber's React code as nearby reference, and both Capacitor and React Native kept open for mobile.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-007</span><h4>First-party features as modules on an internal SDK</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Upstream proved the pattern at scale: a manifest, tokens, liveness, declared stores, and a host that never names a module.</dd>
+<dt>Decision</dt><dd>Every feature is a module with provides, uses and requires, contributing through registries and enforced by lint.</dd>
+<dt>Alternatives</dt><dd>Feature folders by convention (OpenChamber).</dd>
+<dt>Consequences</dt><dd>More ceremony per feature. Missing contribution points surface before the public API freezes.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-008</span><h4>Two APIs: internal module SDK and public extension API</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>An API that serves both first-party and third-party code turns the whole app into a public contract.</dd>
+<dt>Decision</dt><dd>The internal SDK is unstable, in-process and framework-bound. The public API is versioned, async, serializable and capability-gated.</dd>
+<dt>Alternatives</dt><dd>One shared API, as in <code>gui-extensions</code> with <code>.ocdx</code>.</dd>
+<dt>Consequences</dt><dd>Two surfaces to document. Internals stay free to change.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-009</span><h4>Staged extension tiers</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Most customization needs no code, and code from strangers is the main risk.</dd>
+<dt>Decision</dt><dd>Declarative first, sandboxed iframes second, privileged services last. Agent capabilities go into OpenCode engine plugins.</dd>
+<dt>Alternatives</dt><dd>In-process plugins from the start.</dd>
+<dt>Consequences</dt><dd>Untrusted extensions cannot draw native UI inside the timeline at first.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-010</span><h4>Client persistence in SQLite in main</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Upstream's desktop guidance prefers SQLite and cites Windows file-locking problems. Several windows share state.</dd>
+<dt>Decision</dt><dd>One client database with forward-only migrations and stores declared per module.</dd>
+<dt>Alternatives</dt><dd>JSON files, <code>localStorage</code>.</dd>
+<dt>Consequences</dt><dd>Every read crosses IPC, so stores load before modules read them.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-011</span><h4>Extensions never hold agent authority</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Any client holding the credential can approve agent actions, and a prompt can lead to shell execution.</dd>
+<dt>Decision</dt><dd>No API for permission replies, credentials or raw engine HTTP. <code>prompt:send</code> is critical and confirmed per use.</dd>
+<dt>Alternatives</dt><dd>Trust users to judge capabilities alone.</dd>
+<dt>Consequences</dt><dd>Some automation ideas need explicit user steps.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-012</span><h4>Declared engine range with capability detection</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Daily engine releases. Strict request bodies. Additive changes since 2.0.10.</dd>
+<dt>Decision</dt><dd>Support <code>&gt;=2.0.20 &lt;2.1.0</code> at first, with an untested state for newer patches, flags from <code>/api/info</code> and <code>/openapi.json</code>, and a nightly matrix against the floor, the latest release and <code>v2</code> HEAD.</dd>
+<dt>Alternatives</dt><dd>Pin one exact version.</dd>
+<dt>Consequences</dt><dd>Some testing infrastructure to run. Users are not forced into upgrade lockstep.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-013</span><h4>Distribution starts as a curated git index you maintain</h4><span class="status">Decided</span></header><dl>
+<dt>Context</dt><dd>A hosted registry needs accounts, signing, scanning and abuse handling. None of that pays off before there are real publishers.</dd>
+<dt>Decision</dt><dd>A public git repository of index entries (id, versions, download URL, SHA-256, publisher, declared capabilities). Entries arrive by pull request and you review them against written rules. The client reads the index and can hide a yanked version remotely.</dd>
+<dt>Alternatives</dt><dd>npm as the registry. A hosted registry from day one. Open VSX.</dd>
+<dt>Consequences</dt><dd>Review work scales with submissions. Moving to a hosted registry later keeps the same index format.</dd></dl></article>
+
+<article class="adr"><header><span class="id">ADR-014</span><h4>Web and mobile reuse the desktop core</h4><span class="status">Proposed</span></header><dl>
+<dt>Context</dt><dd>Web and mobile follow the desktop. Rewriting UI or gateway per surface would double maintenance.</dd>
+<dt>Decision</dt><dd>One React UI and one gateway core. Web adds a server host with its own login. Mobile wraps the web build in Capacitor.</dd>
+<dt>Alternatives</dt><dd>React Native for mobile. Separate web product.</dd>
+<dt>Consequences</dt><dd>Mobile feels web-based rather than fully native. Extension sandboxing works the same everywhere.</dd></dl></article>
+</section>
+
+<!-- ============================== 13 ============================== -->
+<section id="s13">
+<h2 class="sec"><span class="num">13</span>Product name and branding</h2>
+<div class="note key">
+<span class="label">Recommendation</span>
+<p><strong>Mortise.</strong> In woodworking, a mortise is the slot cut into a frame to receive a tenon. The two lock into one of the strongest joints there is. That is your architecture in one word: a solid frame built to receive parts that others make. It is short, easy to say ("MOR-tiss"), and turned up no AI coding product in my searches.</p>
+</div>
+
+<h3>Shortlist</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Name</th><th>Meaning</th><th>Strengths</th><th>Weaknesses</th></tr></thead>
+<tbody>
+<tr><td><strong>Mortise</strong></td><td>The slot in a frame that receives a tenon</td><td>Says "stable core, fitted parts". Gives a natural vocabulary: extensions are <em>tenons</em>, the index is <em>the Joinery</em>.</td><td>"Mort" reads as death in French and Spanish. A tiny Kubernetes deploy project and a woodworking app share the word.</td></tr>
+<tr><td><strong>Binnacle</strong></td><td>The housing in front of a ship's helm that holds the compass and instruments</td><td>Says "where you watch and steer the agent". No product found in this space.</td><td>Harder to spell. Speaks to monitoring more than to extensibility.</td></tr>
+<tr><td><strong>Kerf</strong></td><td>The width of a saw cut</td><td>Four letters, memorable</td><td>A small PyPI workflow tool named <code>kerf</code> wraps the Claude CLI, which is close to your space</td></tr>
+</tbody></table></div>
+
+<h3>Names I ruled out</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Name</th><th>Conflict found</th></tr></thead>
+<tbody>
+<tr><td>Tessera</td><td>An open-source GUI for Claude Code, Codex and OpenCode (<a href="https://osrepos.com/repo/horang-labs-tessera">Horang-Labs Tessera</a>)</td></tr>
+<tr><td>Trellis</td><td>An AI coding framework that supports OpenCode (<a href="https://docs.trytrellis.app/index.md">Mindfold Trellis</a>)</td></tr>
+<tr><td>Armature</td><td>A YC company building tooling for coding agents (<a href="https://ycombinator.com/companies/armature">Armature</a>)</td></tr>
+<tr><td>Switchyard</td><td>NVIDIA's routing layer for coding agents (<a href="https://docs.nvidia.com/nemo/switchyard/get-started/getting-started">NeMo Switchyard</a>)</td></tr>
+<tr><td>Fettle</td><td>Quality governance for Claude Code and OpenCode sessions (<a href="https://pypi.org/project/finefettle/1.7.0/">finefettle</a>)</td></tr>
+<tr><td>Collet</td><td>A Rust agentic coding orchestrator (<a href="https://docs.rs/crate/collet/latest">collet</a>)</td></tr>
+<tr><td>Gantry</td><td>An agent runtime and an AI launch-readiness app (<a href="https://pkg.go.dev/github.com/shotah/ai-gantry@v0.1.13">ai-gantry</a>, <a href="https://mcpmarket.com/server/gantry">Gantry</a>)</td></tr>
+<tr><td>Lintel, Plinth</td><td>An AI-human engineering platform (<code>bamdadd/lintel</code>) and a Java AI agent toolkit (<code>jabrena/plinth</code>), both on GitHub</td></tr>
+</tbody></table></div>
+<p><span class="tag t-open">Open question</span>These are web searches, not trademark clearance. Before committing, search the USPTO and EUIPO registers in classes 9 and 42, check the domains you want (<code>mortise.dev</code>, <code>mortise.app</code>), the npm scope <code>@mortise</code> and the GitHub organization name.</p>
+
+<h3>Relationship to OpenCode</h3>
+<ul>
+  <li><span class="tag t-ver">Verified</span>OpenCode's README asks projects that use "opencode" in their name to state in their README that they are not built by or affiliated with the OpenCode team. <a class="src" href="https://github.com/anomalyco/opencode/blob/v2.0.25/README.md">README.md</a></li>
+  <li><span class="tag t-rec">Recommendation</span>Keep "opencode" out of the product name entirely. Describe the product as "a desktop workspace for OpenCode", and put a non-affiliation line in the README, the About window and the website footer.</li>
+  <li><span class="tag t-rec">Recommendation</span>Never use OpenCode's logo, color scheme or the <code>oc://</code> scheme, and do not ship OpenCode's 36 themes as your defaults. Importing them as user themes is fine.</li>
+</ul>
+
+<h3>Naming system</h3>
+<div class="tbl wide"><table>
+<thead><tr><th>Thing</th><th>Name</th></tr></thead>
+<tbody>
+<tr><td>Product</td><td>Mortise</td></tr>
+<tr><td>Tagline</td><td>"Your workbench for OpenCode." Plain, says what it is and what it works with.</td></tr>
+<tr><td>Extensions</td><td>Call them <em>extensions</em> in the UI, since users already know the word. Use "tenon" only as a playful internal or community term.</td></tr>
+<tr><td>Extension index</td><td>The Joinery</td></tr>
+<tr><td>Manifest key</td><td><code>"mortise"</code> in <code>package.json</code>, replacing <code>"app"</code> in 7.2</td></tr>
+<tr><td>Packages</td><td><code>@mortise/extension-api</code>, <code>@mortise/ui</code>, <code>@mortise/gateway-core</code>; internal packages stay unpublished</td></tr>
+<tr><td>Extension asset scheme</td><td><code>mortise-ext://&lt;id&gt;/</code></td></tr>
+<tr><td>Extension ids</td><td><code>publisher.name</code>, with the <code>mortise.</code> prefix reserved for built-ins</td></tr>
+</tbody></table></div>
+
+<h3>Visual direction</h3>
+<p><span class="tag t-rec">Recommendation</span>Borrow from the workshop, not from AI clichés. Use graphite surfaces, with one warm metal accent such as brass reserved for focus and primary actions. Pair a sturdy, slightly condensed sans for the interface with a monospace for code and agent output. The mark can be a single mortise-and-tenon joint drawn as two interlocking rectangles: a shape that reads at 16 pixels and says "parts that fit". Keep the brand palette separate from the theme engine, so community themes can restyle the whole app without touching the logo.</p>
+</section>
+
+<!-- ============================== Sources ============================== -->
+<section id="sources">
+<h2 class="sec"><span class="num">A</span>Sources and method</h2>
+<p>Every OpenCode claim comes from tag <code>v2.0.25</code> (<code>b44eea9</code>), extracted with <code>git archive</code>. OpenChamber claims come from a shallow clone of <code>main</code> at <code>9ed7e7d</code>. API counts and schema diffs come from <code>packages/protocol/openapi.json</code> at tags v2.0.0, v2.0.10, v2.0.15, v2.0.20, v2.0.24, v2.0.25 and v2.0.26. Neither project was built or run, and no live engine was tested. Every claim that depends on runtime behavior is labeled Inferred.</p>
+<details class="more"><summary>Key OpenCode files</summary><div>
+<ul>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/AGENTS.md">AGENTS.md</a>: dependency rules, V2 session core</li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/V2_HTTP_API_AUDIT.md">V2_HTTP_API_AUDIT.md</a>: endpoint dispositions</li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/README.md">client/README.md</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/promise/service.ts">client/src/promise/service.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/service-probe.ts">service-probe.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/solid/connection.ts">solid/connection.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/client/src/solid/data.ts">solid/data.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/services/service-registration.ts">cli/src/services/service-registration.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/services/service-config.ts">service-config.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/database-path.ts">database-path.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/cli/src/env.ts">env.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/auth.ts">server/src/auth.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/cors.ts">cors.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/event-feed.ts">event-feed.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/server/src/handlers/event.ts">handlers/event.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/protocol/src/groups/event.ts">protocol/src/groups/event.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/protocol/src/groups/server.ts">groups/server.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/event.ts">schema/src/event.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/event-manifest.ts">event-manifest.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/schema/src/rpc.ts">rpc.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/gui-extensions/README.md">gui-extensions/README.md</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/gui-extensions/AGENTS.md">AGENTS.md</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/gui-extensions/src/sdk/registries.ts">src/sdk/registries.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/extension/manager.ts">desktop/src/main/extension/manager.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/extension/module.ts">module.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/extension/archive.ts">archive.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/ipc-handlers/extensions.ts">ipc-handlers/extensions.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/desktop/src/main/service/background-service.ts">service/background-service.ts</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/plugin/src/README.md">plugin/src/README.md</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/plugin-browser/README.md">plugin-browser/README.md</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/sdk/README.md">sdk/README.md</a></li>
+  <li><a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/app/src/session/requests/auto-approve.ts">app/src/session/requests/auto-approve.ts</a>, <a href="https://github.com/anomalyco/opencode/blob/v2.0.25/packages/ui/src/theme/desktop-theme.schema.json">ui/src/theme/desktop-theme.schema.json</a></li>
+</ul></div></details>
+<details class="more"><summary>Key OpenChamber files</summary><div>
+<ul>
+  <li><a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/AGENTS.md">AGENTS.md</a>: runtime boundaries</li>
+  <li><a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/sdk/README.md">sdk/README.md</a>, <a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/sdk/src/frame-policy.ts">src/frame-policy.ts</a>, <a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/sdk/src/api-version.ts">src/api-version.ts</a></li>
+  <li><a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/extensions/DOCUMENTATION.md">extensions/DOCUMENTATION.md</a>, <a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/guests/DOCUMENTATION.md">web/server/lib/guests/DOCUMENTATION.md</a></li>
+  <li><a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/event-stream/DOCUMENTATION.md">web/server/lib/event-stream/DOCUMENTATION.md</a></li>
+  <li><a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/opencode/lifecycle.js">opencode/lifecycle.js</a>, <a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/opencode/compatibility.js">compatibility.js</a>, <a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/web/server/lib/opencode/v1-migration-topup.js">v1-migration-topup.js</a></li>
+  <li><a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/ui/src/lib/opencode/projection.ts">ui/src/lib/opencode/projection.ts</a>, <a href="https://github.com/openchamber/openchamber/blob/9ed7e7dddb02d350f26a73ac2e370ee6cb160c11/packages/ui/src/lib/opencode/events.ts">events.ts</a></li>
+</ul></div></details>
+<p>Name checks in section 13 used general web searches on 10 October 2026; the links there are the sources.</p>
+<p class="foot">Prepared from static analysis on 10 October 2026. Re-check sections 2.2, 2.4 and 2.8 against any engine release after v2.0.26, since those areas were changing fastest.</p>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  try {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+    var byId = {};
+    links.forEach(function (link) { byId[link.getAttribute('href').slice(1)] = link; });
+    var sections = links.map(function (link) { return document.getElementById(link.getAttribute('href').slice(1)); }).filter(Boolean);
+    if (!('IntersectionObserver' in window) || sections.length === 0) return;
+    var visible = {};
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { visible[entry.target.id] = entry.isIntersecting; });
+      var current = sections.find(function (section) { return visible[section.id]; });
+      if (!current) return;
+      links.forEach(function (link) { link.classList.remove('active'); });
+      byId[current.id].classList.add('active');
+    }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+    sections.forEach(function (section) { observer.observe(section); });
+  } catch (error) {}
+})();
+</script>

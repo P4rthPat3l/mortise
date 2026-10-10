@@ -1,0 +1,31 @@
+{
+  "name": "@mortise/workbench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The React user interface: app shell, composition root and first-party feature modules.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mortise/core": "workspace:*",
+    "@mortise/domain": "workspace:*",
+    "@mortise/engine-opencode": "workspace:*",
+    "@mortise/rpc-contracts": "workspace:*",
+    "@mortise/sdk": "workspace:*",
+    "@mortise/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@mortise/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Electron desktop host: window management, the gateway host and the preload bridge.",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit"
+  },
+  "dependencies": {
+    "@mortise/gateway-core": "workspace:*",
+    "@mortise/rpc-contracts": "workspace:*",
+    "@mortise/workbench": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "44.7.0",
+    "electron-vite": "5.0.0",
+    "vite": "7.3.7"
+  }
+}
