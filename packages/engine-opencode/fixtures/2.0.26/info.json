@@ -1,0 +1,13 @@
+{
+  "version": "2.0.26",
+  "pid": 465453,
+  "urls": [
+    "http://127.0.0.1:42629"
+  ],
+  "paths": {
+    "tmp": "/home/parth/Production/mortise-t007/.sandbox/sandbox-erFVvh/tmp/opencode"
+  },
+  "capabilities": {
+    "persistentPty": true
+  }
+}

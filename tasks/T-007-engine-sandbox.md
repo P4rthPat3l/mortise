@@ -2,12 +2,12 @@
 id: T-007
 title: Engine sandbox script and contract fixtures
 phase: 0
-status: ready
+status: review
 tier: sonnet
 depends_on: []
 covers: [P2, P7]
-assignee: null
-started: null
+assignee: deepseek-v4.1-flash
+started: 2026-10-10
 ---
 
 # T-007 Engine sandbox script and contract fixtures
@@ -42,11 +42,11 @@ A script that starts a fully isolated OpenCode engine for tests, and recorded en
 Adapter code (T-008), CI wiring (T-014).
 
 ## Acceptance criteria
-- [ ] AC-1: The integration test starts a sandbox, gets 200 from `/api/info`, stops it, and finds no leftover process.
-- [ ] AC-2: The same test proves the user's `~/.local/state/opencode/service.json` is byte-identical before and after.
-- [ ] AC-3: Fixtures for the installed engine (2.0.26) are committed. The README says which endpoints and events they cover.
-- [ ] AC-4: Either `events-turn.jsonl` exists from a deterministic provider, or Result explains what was tried and why it failed.
-- [ ] AC-5: No secret (sandbox password, provider keys) appears in fixtures. Redact before writing.
+- [x] AC-1: The integration test starts a sandbox, gets 200 from `/api/info`, stops it, and finds no leftover process.
+- [x] AC-2: The same test proves the user's `~/.local/state/opencode/service.json` is byte-identical before and after.
+- [x] AC-3: Fixtures for the installed engine (2.0.26) are committed. The README says which endpoints and events they cover.
+- [x] AC-4: Either `events-turn.jsonl` exists from a deterministic provider, or Result explains what was tried and why it failed.
+- [x] AC-5: No secret (sandbox password, provider keys) appears in fixtures. Redact before writing.
 
 ## Verification
 ```bash
@@ -67,3 +67,36 @@ bun scripts/record-fixtures.ts
 
 ## Result
 _Filled in by the agent._
+
+### What changed
+- `scripts/engine-sandbox.ts`: `startSandbox({ binary?, version?, port?, config? })` returns `{ url, password, pid, dirs, stop() }`. Runs `opencode serve` (no `--service`) on a loopback port with a random `OPENCODE_PASSWORD`, a temporary `OPENCODE_DB`, and temporary `XDG_*` directories under `.sandbox/` (gitignored). The default binary is `bunx @opencode/cli@<version>` (version 2.0.26); `binary: "installed"` uses `~/.opencode/bin/opencode` then `opencode` on `PATH`. Every start runs `<binary> --version` and refuses unless it prints `opencode v2.`. `stop()` kills the process group; exit handlers do the same on process exit. Runnable standalone.
+- `scripts/fake-provider.ts`: a local OpenAI-compatible chat-completions server. Its script is chosen from the request (no hidden state): a tools-less title request gets plain text, a tools-bearing request gets a text delta plus one `glob` tool call, and the follow-up request carrying the tool result gets the final text. This runs a complete turn with no upstream provider.
+- `scripts/record-fixtures.ts`: starts its own sandbox + fake provider and writes `packages/engine-opencode/fixtures/<version>/` (`info.json`, `openapi.json`, `session-create.json`, `session-get.json`, `sessions-list.json`, `messages.json`, `events-turn.jsonl`, `README.md`). Prefers the installed binary when its version matches, else `bunx`. Redacts the sandbox password and credential-shaped fields.
+- `scripts/engine-sandbox.integration.test.ts`: AC-1 and AC-2, wrapped in `describe.skipIf(!process.env.MORTISE_INTEGRATION)`.
+- Deleted the placeholder `scripts/index.ts`. Updated `scripts/README.md`.
+
+### Isolation (why it is stronger than the task text)
+`opencode serve` with isolated `XDG_*` alone is not hermetic on this machine. The environment exports `OPENCODE_CONFIG=/home/parth/.config/openchamber/opencode.managed.json`, and config discovery also walks up from the process working directory to `~/.opencode` and reads `~/.claude` / `~/.agents`. The sandbox therefore scrubs inherited `OPENCODE_*` variables and redirects `HOME`, `TMPDIR` and the working directory into the sandbox. Verified by `GET /api/config` listing only the sandbox document and its directory.
+
+### Provider outcome (time box)
+Option (a), `@opencode/simulation`, runs in-process via `@opencode/sdk`; it is not pointable at a separately spawned `opencode serve` by engine config, so it was not usable here. Option (b) worked on the first attempt: a custom provider with `package: "@opencode/ai/providers/openai-compatible"`, `settings.baseURL` pointed at the fake server, and one model with `tools: true`. The recorded turn contains `session.tool.called`, `session.tool.success`, text deltas, step and execution events.
+
+### Verification
+- `bun run check` — pass (lint, typecheck, depcruise, vitest; the integration file skips itself without the env var).
+- `MORTISE_INTEGRATION=1 bun run test scripts/engine-sandbox.integration.test.ts` — 2 passed.
+- `bun scripts/record-fixtures.ts` — wrote 8 files to `packages/engine-opencode/fixtures/2.0.26`.
+- Standalone `bun scripts/engine-sandbox.ts --binary installed` and `bun scripts/fake-provider.ts` both start and stop cleanly.
+- `~/.local/state/opencode/service.json` mtime and contents unchanged; no engine process left behind (both asserted by the integration test and checked by hand).
+
+### Note for the maintainer: one `biome.json` change
+`biome check` formats `**/*.json`, so it rewrote the verbatim engine `openapi.json` and failed. I added `"!packages/engine-opencode/fixtures"` to `biome.json` `files.includes`, the same mechanism already used for `docs/research`. This is a scope exclusion, not a change to any lint rule or strictness setting; no rule was disabled. Fixtures are recorded engine output and should not be reformatted. If you would rather keep `biome.json` untouched, the alternative is to run Biome's formatter over `openapi.json` at record time, which couples the fixture bytes to the formatter version.
+
+### Not done / risks
+- `bunx @opencode/cli@2.0.26` is the documented default, but on this machine Bun downloads every platform's optional binary (~GB), so the `bunx` path is slow and was not exercised end to end; the integration test and the committed fixtures use the installed 2.0.26 binary. `bunx` remains wired and version-checked.
+- Fixture bytes embed sandbox-local absolute paths and per-run ids/timestamps (genuine engine output). Re-recording produces a new diff; replay only needs the shapes.
+- `events-turn.jsonl` also contains the location-initialization events that arrive after subscription, not only session events; the README says so.
+
+### Recommended follow-ups
+- T-014 (version matrix) can reuse `startSandbox` with `version: "2.0.20"` to record older-version fixtures.
+- Decide whether fixtures should normalize sandbox paths and volatile ids at record time.
+

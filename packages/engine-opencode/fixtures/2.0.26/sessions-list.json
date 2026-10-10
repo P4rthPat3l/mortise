@@ -1,0 +1,30 @@
+{
+  "data": [
+    {
+      "id": "ses_ed9eb15bcffetgood7Gtp6WZN1",
+      "projectID": "f901891a2ac2abc6a81ebae2b032586da6c88ced",
+      "cost": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      },
+      "time": {
+        "created": 1791640267352,
+        "updated": 1791640267352
+      },
+      "subpath": ".sandbox/sandbox-erFVvh/work",
+      "location": {
+        "directory": "/home/parth/Production/mortise-t007/.sandbox/sandbox-erFVvh/work"
+      }
+    }
+  ],
+  "cursor": {
+    "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZWQ5ZWIxNWJjZmZldGdvb2Q3R3RwNldaTjEiLCJ0aW1lIjoxNzkxNjQwMjY3MzUyLCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+    "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZWQ5ZWIxNWJjZmZldGdvb2Q3R3RwNldaTjEiLCJ0aW1lIjoxNzkxNjQwMjY3MzUyLCJkaXJlY3Rpb24iOiJuZXh0In19"
+  }
+}
