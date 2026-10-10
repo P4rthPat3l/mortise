@@ -7,6 +7,7 @@ Use this index to find the one feature document relevant to a task. Do not load 
 | Feature | Document | Search terms | Primary entry point |
 | ------- | -------- | ------------ | ------------------- |
 | Engine gateway | [FEAT-001-engine-gateway.md](./FEAT-001-engine-gateway.md) | engine gateway, discovery, connection state machine, event stream, resync, request forwarding, engine.fetch | `packages/gateway-core/src/index.ts` |
+| Engine adapter | [FEAT-003-engine-adapter.md](./FEAT-003-engine-adapter.md) | engine adapter, wire formats, event translation, timeline mapping, message ids, permissions, forms | `packages/engine-opencode/src/index.ts` |
 
 FEAT-002 (module system) is created by task T-011.
 
