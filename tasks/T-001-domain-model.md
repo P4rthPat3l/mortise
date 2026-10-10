@@ -2,12 +2,12 @@
 id: T-001
 title: Domain model v0
 phase: 0
-status: ready
+status: review
 tier: sonnet
 depends_on: []
 covers: [P4]
-assignee: null
-started: null
+assignee: claude (sonnet)
+started: 2026-10-10
 ---
 
 # T-001 Domain model v0
@@ -63,4 +63,10 @@ bun run check
 - You want to add a dependency.
 
 ## Result
-_Filled in by the agent._
+**Changed:** `packages/domain/src/` now has `ids.ts`, `server.ts`, `engine.ts`, `connection.ts`, `session.ts`, `timeline.ts`, `requests.ts`, `events.ts`, re-exported from `index.ts`, plus `connection.test.ts`. `README.md` has the export table (AC-6).
+
+**Verified:** `bun run check` passes (lint, typecheck, check:deps, 5 tests). The test proves `ConnectionPhase` equals the ten 6.6 states and that a `switch` on `phase` is exhaustive; helpers (`isTerminalToolState`, id constructors) are covered.
+
+**Decisions:** `ConnectionState.incompatible.reason` is `"info-missing" | "version-out-of-range" | "missing-capability"`; `resyncing` carries `reason: "ended" | "stalled" | "overflow"` and the previous `EngineInfo`. `TimelinePart`/`TimelineItem` use `kind` as discriminant, `TimelinePatch`/`DomainEvent` use `type`. `request.closed` uses `RequestId` (overview sketch had `string`). I did not read the upstream message schemas in depth; the part set follows the task's list.
+
+**Not done / follow-ups:** Part and form shapes will need adjusting in T-008 once the real wire mapping is written. Form `when` conditions and select/multiselect field types are omitted from `FormQuestion` for v0.
