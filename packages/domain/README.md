@@ -18,7 +18,7 @@ Types and small pure helpers for servers, engine info and capabilities, sessions
 | `SessionSummary`, `SessionActivity` | types | `session.ts` | A session list row and its activity |
 | `TimelineItem`, `UserMessageItem`, `AssistantMessageItem` | types | `timeline.ts` | A message in the conversation |
 | `TimelinePart`, `TextPart`, `ReasoningPart`, `ToolCallPart`, `ShellPart`, `CompactionPart`, `ErrorPart`, `ToolState` | types | `timeline.ts` | Renderable pieces of a message |
-| `TimelinePatch` | type | `timeline.ts` | Incremental timeline updates |
+| `TimelinePatch`, `ToolPartPatch` | types | `timeline.ts` | Incremental timeline updates, including partial tool patches |
 | `isTerminalToolState` | function | `timeline.ts` | True for `success` and `failed` |
 | `PendingRequest`, `PermissionRequest`, `FormRequest`, `FormQuestion`, `FormOption` | types | `requests.ts` | Things waiting on the user |
 | `DomainEvent`, `ResyncReason` | types | `events.ts` | Translated engine changes plus `connection.changed` |

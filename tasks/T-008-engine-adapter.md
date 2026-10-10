@@ -2,12 +2,12 @@
 id: T-008
 title: Engine adapter v0
 phase: 0
-status: ready
+status: review
 tier: sonnet
 depends_on: [T-001, T-007]
 covers: [P4]
-assignee: null
-started: null
+assignee: deepseek-v4.1-flash
+started: 2026-10-10
 ---
 
 # T-008 Engine adapter v0
@@ -59,4 +59,43 @@ bun run check
 - A wire concept has no place in the domain model. Propose a domain change instead of leaking the wire type.
 
 ## Result
-_Filled in by the agent._
+**Status:** review. FEAT-003 (`docs/features/FEAT-003-engine-adapter.md`) documents the feature; FEAT-002 was left for the module system as `docs/features/_index.md` and `AGENTS.md` reserve it, so this takes the next free id.
+
+**Changed (adapter, `packages/engine-opencode/src/`):**
+- `ids.ts`: `newMessageId(now?)` reproduces `Identifier.ascending()` — `msg_` + 12 hex chars of `timestamp * 4096 + counter` + 14 random base-62 chars — so ids sort in creation order.
+- `adapter.ts`: `createAdapter({ serverId, baseUrl, fetch })` builds `OpenCode.make` over the injected fetch and binds the operations.
+- `sessions.ts`: `listSessions`, `getSession`, `createSession`, `promptSession` (always `id: clientMessageId`), `interruptSession`, plus `toSessionSummary`.
+- `timeline.ts`: `mapTimeline` maps a message page to a chronological `TimelineItem[]`; text/reasoning parts are keyed by `(messageID, ordinal)`, tool parts by call id.
+- `requests.ts`: pending permissions and forms (runtime decoders used by both reads and events), the answer functions, and `listPendingRequests`.
+- `events.ts`: `translate(wire)` plus `eventDiagnostics`/`resetEventDiagnostics`. Unknown types and malformed payloads are counted separately, never thrown.
+- `index.ts` exports the above. `README.md` gained the endpoint/event mapping tables.
+- Tests: `ids.test.ts`, `sessions.test.ts`, `timeline.test.ts`, `events.test.ts`, `requests.test.ts` (18 new tests).
+
+**Domain changes (additive only, all in `packages/domain`):**
+1. `timeline.ts`: `ToolCallPart` gained optional `metadata?: unknown` and `error?: string` (tool progress metadata and failure text had no home).
+2. `timeline.ts`: new `ToolPartPatch` interface, re-exported from `index.ts`.
+3. `timeline.ts`: `TimelinePatch` gained `item.patched` (the engine corrects a message's `time.created` on `session.inbox.delivered`) and `part.patched` (tool transitions arrive without the whole part, so a pure translator cannot resend it).
+4. `requests.ts`: `FormQuestion.type` gained `"multiselect"` and `"external"`, and `FormQuestion` gained optional `url?: string`.
+No existing domain type was renamed or removed.
+
+**Why `item.patched`/`part.patched`:** a pure, stateless `translate` cannot rebuild a whole tool part (`session.tool.called`/`.success` carry no tool name) or a whole item on `session.inbox.delivered` (no text). The fixture replay proves the alternative — resending wholes — would drop fields.
+
+**Verified:**
+- `bun run check` — pass: lint, typecheck (all packages), `check:deps` (55 modules, no violations, AC-6), 23 tests passed, 2 integration tests skipped.
+- AC-1: `sessions.test.ts` and `timeline.test.ts` replay `sessions-list.json`, `session-get.json`, `session-create.json` and `messages.json` through a fake `fetch` and assert the mapped domain values.
+- AC-2: `events.test.ts` translates every line of `events-turn.jsonl`, reduces the `timeline.patch` events, and asserts deep equality with `mapTimeline(messages.json)`. Passes.
+- AC-3: `ids.test.ts` proves ordering across and within one millisecond.
+- AC-4: `sessions.test.ts` sends the same `clientMessageId` twice and asserts identical bodies containing only `id` and `text`.
+- AC-5: `events.test.ts` asserts unknown and malformed inputs return `[]` and increment the separate counters.
+- Never touched the real engine or its files; only committed fixtures are read.
+
+**Not done / risks:**
+- `info.json` and `openapi.json` are recorded but not replayed here: capability/version detection is the gateway's (T-004) and the task lists it out of scope.
+- `translate` trusts the generated client's decoded types for reads (it validates events only). Read decoding is not runtime-validated beyond that.
+- Non-`user`/`assistant` messages (shell, compaction, synthetic, skill, system, switch markers) are ignored, and several known events map to nothing; both are documented in FEAT-003.
+- `packages/engine-opencode/tsconfig.json` still has `types: []`; the three fixture-reading tests carry a `/// <reference types="node" />` for `node:fs`, which keeps Node types out of the package's declared surface. The depcruise rule already permits Node in tests.
+
+**Follow-ups:**
+- T-012 decides whether `item.patched`/`part.patched` need more fields (e.g. message finish/cost) once the timeline store exists.
+- T-014 can replay older-version fixtures through the same tests.
+

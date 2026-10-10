@@ -27,6 +27,10 @@ export interface ToolCallPart {
   /** Renderers for known tools narrow this; the model layer does not interpret it. */
   readonly input: unknown
   readonly output: unknown
+  /** Opaque progress metadata the engine reports for a running tool. */
+  readonly metadata?: unknown
+  /** Human-readable failure text when the tool call ended in an error. */
+  readonly error?: string
 }
 
 /** A shell command run on the user's behalf. Corresponds to a shell message part. */
@@ -75,11 +79,24 @@ export interface AssistantMessageItem {
 export type TimelineItem = UserMessageItem | AssistantMessageItem
 
 /**
+ * Fields of a tool part that later wire events refine without resending the whole part: the tool
+ * name arrives once on call start, the input, state, output and metadata arrive afterwards.
+ */
+export interface ToolPartPatch {
+  readonly state?: ToolState
+  readonly input?: unknown
+  readonly output?: unknown
+  readonly metadata?: unknown
+  readonly error?: string
+}
+
+/**
  * An incremental change to a session's timeline, so streaming text does not resend whole
  * messages. Corresponds to the folded form of OpenCode session events.
  */
 export type TimelinePatch =
   | { readonly type: "item.added"; readonly item: TimelineItem }
+  | { readonly type: "item.patched"; readonly messageId: MessageId; readonly createdAt: number }
   | { readonly type: "part.added"; readonly messageId: MessageId; readonly part: TimelinePart }
   | {
       readonly type: "part.text.appended"
@@ -88,6 +105,12 @@ export type TimelinePatch =
       readonly delta: string
     }
   | { readonly type: "part.updated"; readonly messageId: MessageId; readonly part: TimelinePart }
+  | {
+      readonly type: "part.patched"
+      readonly messageId: MessageId
+      readonly partId: PartId
+      readonly patch: ToolPartPatch
+    }
   | { readonly type: "item.removed"; readonly messageId: MessageId }
 
 /** True once a tool call can no longer change state. */
