@@ -7,6 +7,9 @@ const npm = (name) => `node_modules/${name}/|node_modules/.*/${name}/`
 const OPENCODE = "node_modules/.*@opencode/"
 const ELECTRON = npm("electron")
 const REACT = `${npm("react")}|${npm("react-dom")}`
+// Tests (including *.integration.test.ts) are exempt only from the "no imports" and "no Node" rules, never from the
+// architecture boundaries between packages.
+const TEST_FILE = "\\.test\\.tsx?$"
 
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
@@ -27,10 +30,17 @@ module.exports = {
     },
     {
       name: "domain-imports-nothing",
-      comment: "@mortise/domain is the leaf of the graph: no packages, no Node, no DOM.",
+      comment: "@mortise/domain production code is the leaf of the graph: no packages, no Node, no DOM.",
       severity: "error",
-      from: { path: "^packages/domain/" },
+      from: { path: "^packages/domain/", pathNot: TEST_FILE },
       to: { pathNot: "^packages/domain/" },
+    },
+    {
+      name: "domain-tests-import-vitest-only",
+      comment: "Domain tests may import the domain and Vitest, nothing else.",
+      severity: "error",
+      from: { path: `^packages/domain/.*${TEST_FILE}` },
+      to: { pathNot: "^packages/domain/|node_modules/vitest/|node_modules/.*/vitest/" },
     },
     {
       name: "opencode-only-in-adapter-and-gateway",
@@ -137,10 +147,12 @@ module.exports = {
     },
     {
       name: "no-node-in-browser-code",
-      comment: "Renderer-side code runs sandboxed and must not use Node built-ins.",
+      comment:
+        "Renderer-side code runs sandboxed and must not use Node built-ins. Tests run under Node in Vitest and may use them (for example node:fs for fixtures).",
       severity: "error",
       from: {
         path: "^(apps/desktop/src/renderer/|packages/(workbench|sdk|ui|engine-opencode|core|domain|rpc-contracts)/)",
+        pathNot: TEST_FILE,
       },
       to: { dependencyTypes: ["core"] },
     },

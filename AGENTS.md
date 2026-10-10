@@ -66,7 +66,7 @@ These come from the architecture and the ADRs. Breaking one is never a judgment 
 
 The allowed import graph, enforced by `bun run check:deps`:
 
-- `domain` imports nothing.
+- `domain` production code imports nothing. Its tests may import Vitest only.
 - `rpc-contracts` imports `domain` and `zod`.
 - `engine-opencode` imports `domain` and the `@opencode/client` Promise root.
 - `gateway-core` imports `domain`, `rpc-contracts`, `@opencode/client/service`, and Node built-ins.
@@ -75,6 +75,7 @@ The allowed import graph, enforced by `bun run check:deps`:
 - `scripts` may import `@opencode/client` and Node built-ins, never application package internals. Only `workbench/src/bootstrap/` may import `engine-opencode`.
 - A feature module in `workbench/src/modules/<id>/` imports another module only through its `contract.ts`, and never imports `core` directly.
 - Electron is imported only in `apps/desktop/src/main` and `apps/desktop/src/preload`.
+- Test files (`*.test.ts`, `*.test.tsx`) may use Node built-ins and Vitest anywhere, but they obey every package boundary above.
 
 When a rule blocks you, the design is telling you something. Do not route around it with re-exports. Ask.
 
