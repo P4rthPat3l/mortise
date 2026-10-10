@@ -23,15 +23,20 @@ export interface FormOption {
   readonly description?: string
 }
 
-/** One question in a form. Corresponds to the string, number, integer, boolean and select fields of `Form`. */
+/**
+ * One question in a form. Corresponds to the string, number, integer, boolean, select, multiselect
+ * and external fields of `Form`.
+ */
 export interface FormQuestion {
   readonly key: string
-  readonly type: "string" | "number" | "integer" | "boolean"
+  readonly type: "string" | "number" | "integer" | "boolean" | "multiselect" | "external"
   readonly title?: string
   readonly description?: string
   readonly required?: boolean
   readonly placeholder?: string
   readonly options?: readonly FormOption[]
+  /** Where an `external` question sends the user to connect or configure something. */
+  readonly url?: string
 }
 
 /** The agent asks the user to fill in a form. Corresponds to an OpenCode `Form` request. */

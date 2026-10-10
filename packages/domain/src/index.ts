@@ -25,6 +25,7 @@ export type {
   TimelinePart,
   TimelinePatch,
   ToolCallPart,
+  ToolPartPatch,
   ToolState,
   UserMessageItem,
 } from "./timeline.js"
