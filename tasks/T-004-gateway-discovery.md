@@ -46,6 +46,8 @@ bun run check
 ```
 
 ## Notes and gotchas
+- FEAT-001 section 28 "Answers" is binding: the gateway never emits `hydrating`; no restart offer in Phase 0; `no-engine` rechecks on focus, on Retry, and every 30 s.
+- This machine exports `OPENCODE_CONFIG` (set by another OpenCode client) and other `OPENCODE_*` variables. When `ensure()` starts the **shared** service, pass the environment through unchanged: the shared service must behave exactly as if the user ran `opencode serve --service` themselves. Scrubbing the environment is only for isolated sandboxes (T-007 does that).
 - `discover()` reads `service.json` and returns `{ url, auth }`. That file is the official discovery contract; read it only through the client library, never directly.
 - The Node `fetch` is available in Node 24. Inject it so tests stay offline.
 

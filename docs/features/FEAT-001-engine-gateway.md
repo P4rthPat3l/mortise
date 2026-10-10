@@ -851,12 +851,23 @@ own readers. They do not change any ADR. A decision that would change one must s
 
 | ID    | Question                                                                                   | Owner              | Needed by | Status |
 |-------|--------------------------------------------------------------------------------------------|--------------------|-----------|--------|
-| Q-001 | Is `hydrating` → `live` a gateway state or a per-window state? The gateway does not read snapshots. | Mortise maintainers | T-004 | Open   |
-| Q-002 | What monitoring signals are wanted (counters, alerts), if any, in Phase 0?                  | Mortise maintainers | T-009     | Open   |
-| Q-003 | Is offering a consented restart in Phase 0 scope, or deferred to a later phase?             | Mortise maintainers | T-004     | Open   |
-| Q-004 | Confirm the batching default: 16 ms (T-005) versus upstream 10 ms and OpenChamber 50 ms.    | Mortise maintainers | T-005     | Open   |
-| Q-005 | When no compatible service runs but the installed CLI is below the floor, which read-only features remain? | Mortise maintainers | T-004 | Open   |
-| Q-006 | Should the gateway surface `no-engine` rechecks only on window focus, or also on a timer?   | Mortise maintainers | T-004     | Open   |
+| Q-001 | Is `hydrating` → `live` a gateway state or a per-window state? The gateway does not read snapshots. | Mortise maintainers | T-004 | Resolved |
+| Q-002 | What monitoring signals are wanted (counters, alerts), if any, in Phase 0?                  | Mortise maintainers | T-009     | Resolved |
+| Q-003 | Is offering a consented restart in Phase 0 scope, or deferred to a later phase?             | Mortise maintainers | T-004     | Resolved |
+| Q-004 | Confirm the batching default: 16 ms (T-005) versus upstream 10 ms and OpenChamber 50 ms.    | Mortise maintainers | T-005     | Resolved |
+| Q-005 | When no compatible service runs but the installed CLI is below the floor, which read-only features remain? | Mortise maintainers | T-004 | Resolved |
+| Q-006 | Should the gateway surface `no-engine` rechecks only on window focus, or also on a timer?   | Mortise maintainers | T-004     | Resolved |
+
+### Answers (maintainer, 2026-10-10)
+
+These answers are binding for T-004, T-005 and T-009. Where they change a rule above, the answer wins.
+
+- **Q-001:** `hydrating` is a per-window state, not a gateway state. The gateway goes `connecting → live` once `/api/info` succeeds and the event stream delivers `server.connected`, and `resyncing → live` after a reconnect (preceded by `engine.resync`). It never emits `hydrating`. The workbench composition root (T-012) shows `hydrating` for its own window from the moment it sees `live` or `engine.resync` until its snapshots load. `ConnectionState` keeps the `hydrating` phase for that UI use.
+- **Q-002:** Phase 0 has no alerts and no metrics pipeline. The gateway writes structured logs (never secrets or payloads) and keeps in-memory counters (reconnects, current generation, last error) that tests can read. A diagnostics view comes in Phase 1.
+- **Q-003:** Deferred. In Phase 0 the `incompatible` state shows the installed and required versions and how to update OpenCode. No restart offer.
+- **Q-004:** 16 ms, one display frame, configurable. It sits between upstream's 10 ms and OpenChamber's 50 ms and matches the renderer's frame batching.
+- **Q-005:** No engine features. The app shell, settings and themes keep working; every engine-backed view shows the update instructions with the installed and minimum versions.
+- **Q-006:** Both. Recheck when a window gains focus, on an explicit "Retry", and on a 30-second timer while in `no-engine`. Discovery is cheap (a file read and one local HTTP probe), but do not poll faster than that.
 
 ## 29. AI Agent Instructions
 

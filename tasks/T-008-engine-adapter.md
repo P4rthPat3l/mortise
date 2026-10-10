@@ -2,7 +2,7 @@
 id: T-008
 title: Engine adapter v0
 phase: 0
-status: todo
+status: ready
 tier: sonnet
 depends_on: [T-001, T-007]
 covers: [P4]
@@ -50,6 +50,8 @@ bun run check
 ```
 
 ## Notes and gotchas
+- T-001 built the timeline and form types before anyone mapped real wire data, and says so in its Result. You may make **additive** changes to `@mortise/domain` (new part kinds, new optional fields, new form field types) when a real wire concept needs a home. List each change in Result. Renaming or removing an existing domain type still needs the maintainer.
+- The fixtures in `packages/engine-opencode/fixtures/2.0.26/` include a full deterministic turn (`events-turn.jsonl`, recorded with `scripts/fake-provider.ts`). They also contain location-initialization events and sandbox-local absolute paths; assert on shapes, not on paths or ids.
 - There is no session status event. Derive activity from `session.execution.*` events (and the `/api/session/active` snapshot during resync).
 - Text and reasoning deltas are ephemeral events without a `durable` envelope. Tool calls are keyed by call id.
 

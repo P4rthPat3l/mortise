@@ -2,7 +2,7 @@
 id: T-001
 title: Domain model v0
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: []
 covers: [P4]

@@ -2,7 +2,7 @@
 id: T-007
 title: Engine sandbox script and contract fixtures
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: []
 covers: [P2, P7]

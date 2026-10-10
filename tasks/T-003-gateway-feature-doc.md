@@ -2,7 +2,7 @@
 id: T-003
 title: FEAT-001 engine gateway feature document
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: []
 covers: [P1, P2, P3]
