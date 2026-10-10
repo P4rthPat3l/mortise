@@ -1,0 +1,45 @@
+name: Engine nightly
+
+# Records the latest @opencode/cli and checks the adapter against it. A failing run is the
+# signal that a new engine release removed or changed something the adapter uses; it commits
+# nothing and never touches the maintainer's engine (it starts an isolated sandbox).
+on:
+  schedule:
+    # Daily at 06:17 UTC. Off the hour so it does not pile onto the cron rush.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  engine-nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # npm fetches only this platform's optional binary; `bunx @opencode/cli` downloads
+      # every platform's, which is why the sandbox and the recorder take a binary path.
+      - name: Install the latest engine
+        run: npm install --prefix .sandbox/cli-latest --no-audit --no-fund @opencode/cli@latest
+
+      - name: Record fixtures for the latest engine
+        run: >-
+          bun scripts/record-fixtures.ts
+          --version latest
+          --binary .sandbox/cli-latest/node_modules/.bin/opencode
+          --out "$RUNNER_TEMP/engine-fixtures"
+
+      - name: Compare the latest engine with the newest committed fixtures
+        run: |
+          newest=$(ls -d packages/engine-opencode/fixtures/*/ | sort -V | tail -1)
+          latest=$(ls -d "$RUNNER_TEMP"/engine-fixtures/*/ | sort -V | tail -1)
+          bun scripts/diff-openapi.ts "${newest}openapi.json" "${latest}openapi.json"
+
+      - name: Run the contract tests against the new recording
+        run: |
+          cp -r "$RUNNER_TEMP"/engine-fixtures/*/ packages/engine-opencode/fixtures/
+          bun run test

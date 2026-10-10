@@ -1,12 +1,19 @@
 /// <reference types="node" />
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { messageId, serverId, sessionId } from "@mortise/domain"
+import type { SessionInfo, SessionsResponse } from "@opencode/client"
 import { describe, expect, it } from "vitest"
 import { createAdapter } from "./adapter.js"
 
-const FIXTURES = new URL("../fixtures/2.0.26/", import.meta.url)
+// One contract run per recorded engine version (T-014).
+const FIXTURES_ROOT = new URL("../fixtures/", import.meta.url)
+const VERSIONS = readdirSync(FIXTURES_ROOT, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort()
 
-const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(name, FIXTURES), "utf8"))
+const fixture = (version: string, name: string): unknown =>
+  JSON.parse(readFileSync(new URL(`${version}/${name}`, FIXTURES_ROOT), "utf8"))
 
 const json = (body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -26,43 +33,63 @@ const makeFetch =
 const makeAdapter = (handler: Handler) =>
   createAdapter({ serverId: serverId("test"), baseUrl: "http://engine.test", fetch: makeFetch(handler) })
 
-describe("session reads", () => {
+describe.each(VERSIONS)("session reads (%s)", (version) => {
   it("AC-1: list maps the recorded session list to summaries", async () => {
-    const adapter = makeAdapter((url) =>
-      url.pathname === "/api/session" ? json(fixture("sessions-list.json")) : undefined,
-    )
+    const raw = fixture(version, "sessions-list.json") as SessionsResponse
+    const adapter = makeAdapter((url) => (url.pathname === "/api/session" ? json(raw) : undefined))
+
     const sessions = await adapter.listSessions()
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0]).toMatchObject({
-      id: "ses_ed9eb15bcffetgood7Gtp6WZN1",
-      title: "",
-      projectId: "f901891a2ac2abc6a81ebae2b032586da6c88ced",
-      createdAt: 1791640267352,
-      updatedAt: 1791640267352,
-      activity: "idle",
+
+    expect(sessions).toHaveLength(raw.data.length)
+    raw.data.forEach((info, index) => {
+      expect(sessions[index]).toMatchObject({
+        id: info.id,
+        title: info.title ?? "",
+        projectId: info.projectID,
+        createdAt: info.time.created,
+        updatedAt: info.time.updated,
+        activity: "idle",
+      })
+      expect(sessions[index]?.directory).toBe(info.location.directory)
     })
+    expect(sessions[0]?.directory).toContain("<sandbox>")
   })
 
   it("AC-1: get maps the recorded session to a summary", async () => {
-    const adapter = makeAdapter((url) =>
-      url.pathname === "/api/session/ses_ed9eb15bcffetgood7Gtp6WZN1" ? json(fixture("session-get.json")) : undefined,
-    )
-    const session = await adapter.getSession(sessionId("ses_ed9eb15bcffetgood7Gtp6WZN1"))
-    expect(session.projectId).toBe("f901891a2ac2abc6a81ebae2b032586da6c88ced")
-    expect(session.directory).toContain("sandbox-erFVvh/work")
+    const raw = fixture(version, "session-get.json") as { data: SessionInfo }
+    const adapter = makeAdapter((url) => (url.pathname === `/api/session/${raw.data.id}` ? json(raw) : undefined))
+
+    const session = await adapter.getSession(sessionId(raw.data.id))
+
+    expect(session).toMatchObject({
+      id: raw.data.id,
+      title: raw.data.title ?? "",
+      projectId: raw.data.projectID,
+      createdAt: raw.data.time.created,
+      updatedAt: raw.data.time.updated,
+      activity: "idle",
+    })
+    expect(session.directory).toBe(raw.data.location.directory)
   })
 
   it("AC-1: create maps the recorded session and sends the requested fields", async () => {
+    const raw = fixture(version, "session-create.json") as { data: SessionInfo }
     let body: unknown
     const adapter = makeAdapter((url, init) => {
       if (url.pathname === "/api/session" && init.method === "POST") {
         body = JSON.parse(typeof init.body === "string" ? init.body : "{}")
-        return json(fixture("session-create.json"))
+        return json(raw)
       }
       return undefined
     })
+
     const session = await adapter.createSession({ directory: "/work", title: "Hello" })
-    expect(session.id).toBe("ses_ed9eb15bcffetgood7Gtp6WZN1")
+
+    expect(session).toMatchObject({
+      id: raw.data.id,
+      title: raw.data.title ?? "",
+      projectId: raw.data.projectID,
+    })
     expect(body).toEqual({ location: { directory: "/work" }, title: "Hello" })
   })
 })

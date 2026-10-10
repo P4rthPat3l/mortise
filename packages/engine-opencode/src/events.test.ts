@@ -1,17 +1,35 @@
 /// <reference types="node" />
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import type { TimelineItem, TimelinePatch } from "@mortise/domain"
 import type { SessionMessagesResponse } from "@opencode/client"
 import { describe, expect, it } from "vitest"
 import { eventDiagnostics, resetEventDiagnostics, translate } from "./events.js"
 import { mapTimeline } from "./timeline.js"
 
-const FIXTURES = new URL("../fixtures/2.0.26/", import.meta.url)
+// One contract run per recorded engine version (T-014).
+const FIXTURES_ROOT = new URL("../fixtures/", import.meta.url)
+const VERSIONS = readdirSync(FIXTURES_ROOT, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort()
 
-const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(name, FIXTURES), "utf8"))
+/** Every file a recording writes. The integrity test fails if one is missing. */
+const RECORDED_FILES = [
+  "info.json",
+  "openapi.json",
+  "session-create.json",
+  "session-get.json",
+  "sessions-list.json",
+  "messages.json",
+  "events-turn.jsonl",
+  "README.md",
+] as const
 
-const readTurn = (): unknown[] =>
-  readFileSync(new URL("events-turn.jsonl", FIXTURES), "utf8")
+const fixture = (version: string, name: string): unknown =>
+  JSON.parse(readFileSync(new URL(`${version}/${name}`, FIXTURES_ROOT), "utf8"))
+
+const readTurn = (version: string): unknown[] =>
+  readFileSync(new URL(`${version}/events-turn.jsonl`, FIXTURES_ROOT), "utf8")
     .split("\n")
     .filter((line) => line.trim() !== "")
     .map((line) => JSON.parse(line))
@@ -59,19 +77,36 @@ const applyPatch = (items: TimelineItem[], patch: TimelinePatch): TimelineItem[]
   }
 }
 
-describe("translate", () => {
+describe("contract fixtures", () => {
+  it("record every supported engine version", () => {
+    expect(VERSIONS).toEqual(expect.arrayContaining(["2.0.20", "2.0.26"]))
+  })
+
+  it("AC-4: contain no absolute home directory path", () => {
+    for (const version of VERSIONS) {
+      for (const name of RECORDED_FILES) {
+        const contents = readFileSync(new URL(`${version}/${name}`, FIXTURES_ROOT), "utf8")
+        expect(contents, `${version}/${name}`).not.toContain("/home/")
+      }
+    }
+  })
+})
+
+describe.each(VERSIONS)("recorded turn (%s)", (version) => {
   it("AC-2: the recorded turn reduces to the final message-list timeline", () => {
-    const reduced = readTurn()
+    const reduced = readTurn(version)
       .flatMap((wire) => translate(wire))
       .reduce<TimelineItem[]>((items, event) => {
         if (event.type !== "timeline.patch") return items
         return applyPatch(items, event.patch)
       }, [])
 
-    const snapshot = mapTimeline(fixture("messages.json") as SessionMessagesResponse)
+    const snapshot = mapTimeline(fixture(version, "messages.json") as SessionMessagesResponse)
     expect(reduced).toEqual(snapshot)
   })
+})
 
+describe("translate", () => {
   it("AC-5: an unknown event type is counted, not thrown", () => {
     resetEventDiagnostics()
     expect(translate({ id: "evt_0", created: 1, type: "future.thing", data: {} })).toEqual([])

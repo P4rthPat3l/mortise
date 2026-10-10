@@ -27,10 +27,10 @@ export const DEFAULT_VERSION = "2.0.26"
 /** Every engine this client supports prints its version as `opencode v2.x.y`. */
 const VERSION_PREFIX = "opencode v2."
 
-export type SandboxBinary = "bunx" | "installed"
+export type SandboxBinary = "bunx" | "installed" | { readonly path: string }
 
 export interface SandboxOptions {
-  /** `"bunx"` (default) runs the pinned npm CLI; `"installed"` runs the local binary. */
+  /** `"bunx"` (default) runs the pinned npm CLI; `"installed"` runs the local binary; `{ path }` runs that executable. */
   binary?: SandboxBinary
   /** npm version for the `"bunx"` binary. Defaults to {@link DEFAULT_VERSION}. */
   version?: string
@@ -61,6 +61,15 @@ export interface Sandbox {
 }
 
 /**
+ * Path to an engine installed with npm under `.sandbox/cli-<version>/`, or `undefined` when absent.
+ * Installing an older engine this way fetches only this platform's optional package, unlike `bunx`.
+ */
+export function resolveSandboxBinary(version: string): string | undefined {
+  const candidate = join(SANDBOX_ROOT, `cli-${version}`, "node_modules", ".bin", "opencode")
+  return existsSync(candidate) ? candidate : undefined
+}
+
+/**
  * The command that starts the engine, before the `serve` subcommand.
  * Returns the local binary path when present, else `opencode` on `PATH`.
  */
@@ -68,6 +77,13 @@ export function resolveInstalledBinary(): string | undefined {
   const local = join(homedir(), ".opencode", "bin", "opencode")
   if (existsSync(local)) return local
   return which("opencode")
+}
+
+/** Builds the full command line for one selected binary. */
+export function sandboxCommand(binary: SandboxBinary, version: string): string[] {
+  if (typeof binary === "object") return [binary.path]
+  if (binary === "installed") return [resolveInstalledBinary() ?? "opencode"]
+  return ["bunx", `@opencode/cli@${version}`]
 }
 
 /** Runs `<command> --version` and returns the version, or `undefined` when it is not a v2 engine. */
@@ -85,8 +101,7 @@ export async function readVersion(command: readonly string[]): Promise<string | 
 export async function startSandbox(options: SandboxOptions = {}): Promise<Sandbox> {
   const binary = options.binary ?? "bunx"
   const version = options.version ?? DEFAULT_VERSION
-  const command =
-    binary === "installed" ? [resolveInstalledBinary() ?? "opencode"] : ["bunx", `@opencode/cli@${version}`]
+  const command = sandboxCommand(binary, version)
 
   const reported = await readVersion(command)
   if (reported === undefined) {
@@ -322,9 +337,16 @@ function parseArgs(argv: readonly string[]): { version?: string; port?: number; 
     const arg = argv[index]
     if (arg === "--version") options.version = argv[++index]
     else if (arg === "--port") options.port = Number(argv[++index])
-    else if (arg === "--binary") options.binary = argv[++index] as SandboxBinary
+    else if (arg === "--binary") options.binary = parseSandboxBinary(argv[++index])
   }
   return options
+}
+
+/** Parses a `--binary` value: `"installed"`, `"bunx"`, or an executable path. */
+export function parseSandboxBinary(value: string | undefined): SandboxBinary {
+  if (value === "installed" || value === "bunx") return value
+  if (value !== undefined && value !== "") return { path: value }
+  throw new Error(`--binary must be "installed", "bunx" or a binary path, got ${String(value)}`)
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

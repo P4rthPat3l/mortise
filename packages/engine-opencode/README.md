@@ -61,5 +61,6 @@ Everything else the engine emits (catalog refreshes, usage, PTYs, TUI, shell, co
 
 ## Notes
 
-- The recorded responses under `fixtures/<version>/` are replayed through a fake `fetch` in the contract tests. `fixtures/` is recorded engine output; do not reformat it.
+- The recorded responses under `fixtures/<version>/` are replayed through a fake `fetch` in the contract tests, once per version (2.0.20 and 2.0.26). `fixtures/` is recorded engine output; do not reformat it, and it never contains a machine path (`<sandbox>`, `<repo>` and `<home>` stand in).
+- `bun scripts/diff-openapi.ts <old> <new>` compares two recorded specs and fails when an operation or request field the adapter uses was removed or changed incompatibly.
 - Reads trust the generated client's decoded types. Events are raw JSON, so `translate` validates each payload itself.

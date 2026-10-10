@@ -1,0 +1,125 @@
+{
+  "data": [
+    {
+      "id": "msg_1263bae8e001KhlPtOpU0lIsUO",
+      "time": {
+        "created": 1791642807950
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+    },
+    {
+      "id": "msg_1263bae3c001wUIKbhzjdx0GJp",
+      "time": {
+        "created": 1791642807897,
+        "streamed": 1791642807917,
+        "completed": 1791642807943
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+        "id": "fake-model",
+        "providerID": "fake"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Sandbox turn complete."
+        }
+      ],
+      "snapshot": {
+        "start": "64fe2a21668a438b52d69e97759d76dd3540621a",
+        "end": "64fe2a21668a438b52d69e97759d76dd3540621a",
+        "files": []
+      },
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      }
+    },
+    {
+      "id": "msg_1263badcc001R3fF3nCbgf3OIH",
+      "time": {
+        "created": 1791642807814,
+        "streamed": 1791642807836,
+        "completed": 1791642807856
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+        "id": "fake-model",
+        "providerID": "fake"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Let me look. "
+        },
+        {
+          "type": "tool",
+          "id": "call_fake_1",
+          "name": "glob",
+          "executed": false,
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "*.txt"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "No files found"
+              }
+            ],
+            "metadata": {
+              "count": 0,
+              "truncated": false
+            }
+          },
+          "time": {
+            "created": 1791642807826,
+            "ran": 1791642807832,
+            "completed": 1791642807847
+          }
+        }
+      ],
+      "snapshot": {
+        "start": "64fe2a21668a438b52d69e97759d76dd3540621a",
+        "end": "64fe2a21668a438b52d69e97759d76dd3540621a",
+        "files": []
+      },
+      "finish": "tool-calls",
+      "rawFinish": "tool_calls",
+      "cost": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      }
+    },
+    {
+      "id": "msg_1263bac44001xDHBznQHu7OyHh",
+      "time": {
+        "created": 1791642807738
+      },
+      "text": "List the text files in the working directory.",
+      "type": "user"
+    }
+  ],
+  "cursor": {
+    "previous": "eyJpZCI6Im1zZ18xMjYzYmFlOGUwMDFLaGxQdE9wVTBsSXNVTyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+    "next": "eyJpZCI6Im1zZ18xMjYzYmFjNDQwMDF4REhCem5RSHU3T3lIaCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+}
