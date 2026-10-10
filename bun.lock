@@ -59,6 +59,7 @@
         "@mortise/domain": "workspace:*",
         "@mortise/rpc-contracts": "workspace:*",
         "@opencode/client": "2.0.26",
+        "zod": "4.6.5",
       },
       "devDependencies": {
         "@types/node": "26.6.5",
