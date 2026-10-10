@@ -71,8 +71,8 @@ The allowed import graph, enforced by `bun run check:deps`:
 - `engine-opencode` imports `domain` and the `@opencode/client` Promise root.
 - `gateway-core` imports `domain`, `rpc-contracts`, `@opencode/client/service`, and Node built-ins.
 - `core` imports `domain`. `sdk` imports `core`, `domain`, `react`. `ui` imports `react` only.
-- `workbench` imports `core`, `sdk`, `ui`, `domain`, `rpc-contracts`, `react`, `react-dom`.
-- `scripts` may import `@opencode/client` and Node built-ins, never application package internals. Only `workbench/src/bootstrap/` may import `engine-opencode`.
+- `workbench` imports `core`, `sdk`, `ui`, `domain`, `rpc-contracts`, `react`, `react-dom`. Only `workbench/src/bootstrap/` may import `engine-opencode`.
+- `scripts` may import `@opencode/client` and Node built-ins, never application package internals.
 - A feature module in `workbench/src/modules/<id>/` imports another module only through its `contract.ts`, and never imports `core` directly.
 - Electron is imported only in `apps/desktop/src/main` and `apps/desktop/src/preload`.
 - Test files (`*.test.ts`, `*.test.tsx`) may use Node built-ins and Vitest anywhere, but they obey every package boundary above.
@@ -81,14 +81,34 @@ When a rule blocks you, the design is telling you something. Do not route around
 
 ## Workflow for a task
 
-1. **Claim it.** In the task file, set `status: in-progress`, `assignee:` your agent name, and `started:` today's date. Update the row in `tasks/README.md`.
-2. **Branch.** The base branch is `main`. `git switch main && git switch -c t<NNN>-<short-slug>`, for example `t004-gateway-discovery`. At most three words after the task number.
-3. **Design first when the task asks for it.** Tasks that introduce a feature start with a feature document in `docs/features/`, written with the `feature-documentation` skill in Mode A. Read `.agents/skills/feature-documentation/SKILL.md`.
-4. **Implement** inside the task's scope. Tests go next to the code as `*.test.ts`.
+1. **Claim it.** In your task file, set `status: in-progress`, `assignee:` your agent name, and `started:` today's date. Do not edit `tasks/README.md`: the board belongs to the reviewer, which keeps parallel branches free of conflicts.
+2. **Branch.** The base branch is `main`. `git switch main && git switch -c t<NNN>-<short-slug>`, for example `t004-gateway-discovery`. At most three words after the task number. If you were started inside a prepared worktree, you are already on your branch.
+3. **Read or write the feature document first.** Follow "Feature documentation" below before writing any code.
+4. **Implement** inside the task's scope. Tests go next to the code as `*.test.ts`. Name tests after the feature document's rule IDs where they exist (for example `BR-004 never passes a version to ensure()`).
 5. **Verify.** Run every command in the task's Verification section, then `bun run check`. All must pass.
-6. **Document.** Update the package `README.md` if its responsibility or API changed. Move the feature document to Mode D (synchronized) if the task implements one. Record new decisions as an ADR (see `docs/adr/README.md`).
-7. **Hand back.** Fill in the task's `## Result` section: what changed, how you verified it, anything left undone, follow-up tasks you recommend. Set `status: review` and update the board.
+6. **Document.** Synchronize the feature document (see below). Update the package `README.md` if its responsibility or API changed. Record cross-cutting decisions as an ADR (see `docs/adr/README.md`).
+7. **Hand back.** Fill in the task's `## Result` section: what changed, how you verified it, anything left undone, follow-up tasks you recommend. Set `status: review` in your task file only.
 8. **Commit** with Conventional Commits: `type(scope): summary`. Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`. Scope is the package or area, for example `feat(gateway-core): discover the shared service`. Push or open a pull request only if the maintainer's instructions for your session say so; otherwise leave the commit on your local branch.
+
+## Feature documentation
+
+Every feature has one canonical document in `docs/features/`, written and maintained with the `feature-documentation` skill. Load the skill before touching a feature document: in Claude Code it is available as a skill; in any other tool, read `.agents/skills/feature-documentation/SKILL.md` and the template it names. Do not write feature documents from memory.
+
+Use it on every task, not only tasks that say so:
+
+| Situation | What to do |
+| --- | --- |
+| The task builds a feature that has no document yet | Write it in **Mode A** before coding, using the next free `FEAT-NNN` id, and add a row to `docs/features/_index.md` |
+| The task implements part of a feature that has a document | Read it first. It is your specification: follow its business rules (`BR-*`), acceptance criteria (`AC-*`) and security rules (`SEC-*`), and its "Answers" to open questions. Run the skill's drift check if it has a `last_verified_commit` |
+| The task changes how an existing feature behaves | Plan in **Mode C** (separate current behavior from the proposed change) before coding |
+| You finished implementing | Synchronize in **Mode D** in the same branch: move what you built from `Planned` to `Current`, replace planned paths with real ones, set `implementation_status`, and set `last_verified_commit` to your implementation commit in a final docs commit |
+
+Rules:
+
+- A feature document never claims `Current` for code you did not read at the recorded commit.
+- Never answer a document's open questions yourself, and never move `status` to `approved`. Add your question to its Open Questions section, set your task to `blocked`, and ask.
+- If code and document disagree, the code is what runs. Report the mismatch in your Result instead of silently picking one.
+- Feature-to-task map: FEAT-001 engine gateway covers T-004, T-005, T-006, T-009 and T-013. FEAT-002 module system is written in T-011 and used by T-012.
 
 ## When to stop and ask the maintainer
 
@@ -113,8 +133,9 @@ Write the question into the task's `## Result` section, set `status: blocked`, a
 ## Testing
 
 - Unit tests use Vitest and run without network, display, or a real engine.
-- Integration tests that need a real engine are named `*.integration.test.ts` and run only when `MORTISE_INTEGRATION=1`. Vitest collects them during `bun run check`, so each file must skip itself: wrap its suites in `describe.skipIf(!process.env.MORTISE_INTEGRATION)(...)`.
-- `bun run check` currently passes with zero tests. Every implementation task adds tests. They must start an isolated engine (`scripts/engine-sandbox.ts`, created in T-007), never use the user's shared service except in the read-only coexistence test (T-013).
+- Integration tests that need a real engine are named `*.integration.test.ts` and run only when `MORTISE_INTEGRATION=1`. Vitest collects them during `bun run check`, so each file must skip itself: wrap its suites in `describe.skipIf(!process.env.MORTISE_INTEGRATION)(...)`. They start an isolated engine with `startSandbox` from `scripts/engine-sandbox.ts`, and never use the user's shared service except in the read-only coexistence test (T-013).
+- For a deterministic agent turn without a real model, use `scripts/fake-provider.ts` (see `scripts/README.md`). Recorded engine responses live in `packages/engine-opencode/fixtures/<version>/`.
+- Every implementation task adds tests.
 - Test behavior through public entry points. No mocking of modules you own; inject dependencies (fetch, clock, spawn) instead.
 
 ## OpenCode facts and upstream source
@@ -130,5 +151,5 @@ Write the question into the task's `## Result` section, set `status: blocked`, a
 - `docs/architecture/overview.md`: the architecture; read its "Repository mapping" section first
 - `docs/architecture/extension-system.md`, `docs/architecture/roadmap.md`
 - `docs/adr/`: decisions. Never edit an accepted ADR's decision; supersede it
-- `docs/features/`: one feature document per feature. Read the relevant one before changing a feature. Index: `docs/features/_index.md`
+- `docs/features/`: one feature document per feature, maintained with the `feature-documentation` skill (see "Feature documentation"). Index: `docs/features/_index.md`
 - `docs/research/`: the full research document (HTML, 170 KB). Read only the section you need
