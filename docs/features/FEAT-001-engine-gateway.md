@@ -10,9 +10,9 @@ owner: Mortise maintainers
 created: 2026-10-10
 last_updated: 2026-10-11
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: cf291d5
+last_verified_commit: 31b3238
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.5
+version: 0.1.6
 tags:
   - gateway
   - engine
@@ -41,7 +41,7 @@ related_features: []
 | Data stores           | Engine server list in client SQLite; engine password in main memory now, OS keychain later           |
 | External systems      | OpenCode v2 engine (`opencode serve --service`), registration file via `@opencode/client/service`    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`; T-006 forwarding read at `508aaff`. The desktop host (T-009) has no code yet |
+| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`; T-006 forwarding read at `508aaff`. T-013 added the coexistence and resilience integration tests at `31b3238`. The desktop host (T-009) has no code yet |
 
 ### At a Glance
 
@@ -590,6 +590,9 @@ the forwarding half: a `401` response is returned to the caller and the connecti
 Test: `events.test.ts` (BR-013, BR-015): a 45 s silence reconnects as `stalled` with a `gap` resync; a
 server close reconnects as `overflow` with an `overflow` resync; a dedicated case stalls the stream
 mid-batch and asserts no generation-N event is delivered after the generation-N+1 resync.
+`coexistence.integration.test.ts` (T-013) drops a real engine's stream mid-turn and asserts the
+`engine.resync` of generation 2 arrives before the gateway returns to `live`; `resync.integration.test.ts`
+(T-013) proves the rebuilt adapter timeline equals a fresh load after a dropped stream and after a restart.
 
 ### AC-006: Ordered batched delivery — Status: **Current**
 
@@ -658,7 +661,7 @@ Test: Untested; planned in T-009 (build assertion over `apps/desktop/out/`).
 | CASE-003 | First event is not `server.connected`               | Reconnect and log an error without payload contents              | Unit                 |
 | CASE-004 | Event queue overflow closes the stream              | Reconnect with resync                                            | Unit                 |
 | CASE-005 | Malformed JSON in one event                         | Skip and log; stream continues                                   | Unit                 |
-| CASE-006 | Registration replaced while live                    | Move to `discovering`, recheck, rejoin                           | Integration (T-013)  |
+| CASE-006 | Registration replaced while live                    | Move to `discovering`, recheck, rejoin                           | Integration (`coexistence.integration.test.ts`)  |
 | CASE-007 | Password rotated; next request returns `401`        | Re-read registration; recover if the password changed            | Unit                 |
 | CASE-008 | Version `2.0.19` running                            | `incompatible`; not replaced; update guidance offered            | Unit                 |
 | CASE-009 | Version `2.1.0` running                             | `unsupported`; not joined as supported; clear actions            | Unit                 |
@@ -732,11 +735,14 @@ Tests run with Vitest, next to the code. Unit tests use injected `fetch`, clock,
 logger — no network, no display, no real engine. Integration tests that need an isolated engine are
 named `*.integration.test.ts` and are wrapped in `describe.skipIf(!process.env.MORTISE_INTEGRATION)`.
 
-| Test type   | Coverage                                              | Planned path                                        |
+| Test type   | Coverage                                              | Path                                                |
 |-------------|-------------------------------------------------------|-----------------------------------------------------|
 | Unit        | Discovery, start policy, probe, capabilities, state machine, stream, forwarding | `packages/gateway-core/src/*.test.ts` |
 | Unit        | Desktop host and both transports                      | `apps/desktop/src/main/*.test.ts`, `apps/desktop/src/renderer/*.test.ts` |
-| Integration | Coexistence and resync against an isolated engine     | `packages/gateway-core/src/*.integration.test.ts` (T-013) |
+| Integration | Coexistence: join without replacing, survive a replacement, read-only check of the shared service | `packages/gateway-core/src/coexistence.integration.test.ts` (T-013) |
+| Integration | Resync: a dropped stream and an engine restart rebuild the same timeline | `packages/engine-opencode/src/resync.integration.test.ts` (T-013) |
+
+The integration files are skipped unless `MORTISE_INTEGRATION=1`; the shared-service test additionally needs `MORTISE_SHARED_SERVICE_TEST=1`. They start engines with `startSandbox` from `scripts/engine-sandbox.ts`, which grew `--service` (a temporary registration plus a real replacement), tree reuse for a restart, and `dispose()` (T-013). No single package may import both `gateway-core` and `engine-opencode`, so the resync suite is split: `gateway-core` proves the resync marker against a real engine and `engine-opencode` proves the adapter rebuilds the same timeline.
 
 SSE and forwarding fixtures use a local Node `http` server, so the stream and forwarding tests need
 no engine.
@@ -970,6 +976,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | 2026-10-11 | 0.1.3   | Mode D sync for T-005: the event stream (`events.ts`) is `Current` at `4323cc7`; BR-011..BR-017, AC-005..AC-007 and OPS-001/002/003/005/006 move to `Current`; corrected stale §12 event and §22 configuration statuses | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.4   | Mode D sync for T-006: `forward.ts` is `Current` at `508aaff`; BR-019..BR-026, AC-008, AC-009, SEC-003 and SEC-004 move to `Current`; added the `FORWARD_TIMEOUT_MS` constant to §22 | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.5   | Relay a handler-thrown `ChannelError` code through `createServer` (`channel.ts` at `cf291d5`) so the forwarding boundary's `forbidden_path`, `engine_unreachable` and `timeout` reach the caller instead of collapsing to `internal` | Current | deepseek-v4.1-flash |
+| 2026-10-11 | 0.1.6   | Mode D sync for T-013: added the coexistence (`gateway-core`) and resync (`engine-opencode`) integration suites and the sandbox `--service`, `stateDir`, `reuse` and `dispose` support they need; recorded the real paths in §20 and marked CASE-006 covered | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 
