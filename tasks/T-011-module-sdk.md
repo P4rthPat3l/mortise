@@ -111,5 +111,5 @@ Verification command is `bun run check`; `bun run test` and `bun run typecheck` 
   required peers, and without them the hook tests cannot run under the isolated linker. I added those
   three to `packages/sdk` devDependencies as well. No runtime dependency was added.
 
-**Suggested commits:** the branch has four commits: the FEAT-002 Mode A document, the SDK
-implementation, the FEAT-002 Mode D sync, and this result.
+**Commits:** the FEAT-002 Mode A document, the SDK implementation, the FEAT-002 Mode D sync (verified
+at `d784c30`, the final code commit), a test-name correction in `react.test.tsx`, and the task result.
