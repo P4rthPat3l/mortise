@@ -76,7 +76,7 @@ describe("react bindings", () => {
     expect(screen.getByTestId("count").textContent).toBe("1")
   })
 
-  test("BR-010 a hook without a provider throws", () => {
+  test("a hook without ModuleHostProvider throws", () => {
     function Bare() {
       useLive(Greeting)
       return null
