@@ -10,7 +10,7 @@ owner: Mortise maintainer
 created: 2026-10-11
 last_updated: 2026-10-11
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 52bddf8
+last_verified_commit: d784c30
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
 version: 0.1.1
 tags:
@@ -33,7 +33,7 @@ related_features: []
 | Field                 | Details                                                                                              |
 |-----------------------|------------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                              |
-| Implementation status | Shipped and verified at `52bddf8` (T-011)                                                            |
+| Implementation status | Shipped and verified at `d784c30` (T-011)                                                            |
 | Owner                 | Mortise maintainer                                                                                   |
 | Primary actors        | A first-party feature module (author), the composition root that builds the host, React components    |
 | Trigger               | A module registers with the host at window boot; a provider activates, fails, or is disabled          |
@@ -41,7 +41,7 @@ related_features: []
 | Entry points          | `@mortise/sdk` (`packages/sdk/src/index.ts`): `Module`, `Contract`, `createModuleHost`, hooks         |
 | Data stores           | Declared module stores (in-memory now; persisted in a later phase). No engine data                    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | 2026-10-11 at `52bddf8`                                                                              |
+| Last verified         | 2026-10-11 at `d784c30`                                                                              |
 
 **Status legend.** Every `Status` value below is one of: **Current** (read in the code at `last_verified_commit`) · **Planned** (not implemented) · **Inferred** (not directly verified) · **Unknown**.
 
@@ -253,20 +253,20 @@ now so consumers can match on all four cases today.
 
 ### Existing
 
-Everything below was read at `52bddf8`, the T-011 implementation commit.
+Everything below was read at `d784c30`, the T-011 implementation commit.
 
 | Layer       | Responsibility                                              | Repository path                  | Main symbol                                             | Verified  |
 |-------------|-------------------------------------------------------------|----------------------------------|---------------------------------------------------------|-----------|
-| Core        | Disposables, registries, store, event bus                   | `packages/core/src/`             | `DisposableScope`, `Registries`, `Registry`, `createStore`, `Store`, `EventBus` | `52bddf8` |
-| Core docs   | Public API table for the primitives the host builds on      | `packages/core/README.md`        | —                                                       | `52bddf8` |
-| Contracts   | Typed contract tokens and their value type                  | `packages/sdk/src/contract.ts`   | `Contract`, `ContractValue`                             | `52bddf8` |
-| Liveness    | The `Live<T>` union and its inactive reasons                | `packages/sdk/src/live.ts`       | `Live`, `LiveInactiveReason`                            | `52bddf8` |
-| Manifest    | `Module.define`, definition and context types, `Setup<D>`, declared stores | `packages/sdk/src/module.ts` | `Module`, `ModuleInput`, `ModuleDefinition`, `ModuleContext`, `Setup`, `Store`, `StoreDefinition` | `52bddf8` |
-| Host        | Dependency-ordered activation, blocking, failure isolation, disable, withdrawal | `packages/sdk/src/host.ts` | `createModuleHost`, `ModuleHost`, `ModuleHostCore`      | `52bddf8` |
-| React       | Provider and the three hooks on `useSyncExternalStore`      | `packages/sdk/src/react.tsx`     | `ModuleHostProvider`, `useModule`, `useLive`, `useStoreSelector` | `52bddf8` |
-| Entry       | JSDoc'd public exports                                      | `packages/sdk/src/index.ts`      | —                                                       | `52bddf8` |
-| Tests       | Behaviour and type coverage for every rule below            | `packages/sdk/src/host.test.ts`, `module.test.ts`, `contract.test.ts`, `react.test.tsx` | — | `52bddf8` |
-| Docs        | Package responsibility and public API table                 | `packages/sdk/README.md`         | —                                                       | `52bddf8` |
+| Core        | Disposables, registries, store, event bus                   | `packages/core/src/`             | `DisposableScope`, `Registries`, `Registry`, `createStore`, `Store`, `EventBus` | `d784c30` |
+| Core docs   | Public API table for the primitives the host builds on      | `packages/core/README.md`        | —                                                       | `d784c30` |
+| Contracts   | Typed contract tokens and their value type                  | `packages/sdk/src/contract.ts`   | `Contract`, `ContractValue`                             | `d784c30` |
+| Liveness    | The `Live<T>` union and its inactive reasons                | `packages/sdk/src/live.ts`       | `Live`, `LiveInactiveReason`                            | `d784c30` |
+| Manifest    | `Module.define`, definition and context types, `Setup<D>`, declared stores | `packages/sdk/src/module.ts` | `Module`, `ModuleInput`, `ModuleDefinition`, `ModuleContext`, `Setup`, `Store`, `StoreDefinition` | `d784c30` |
+| Host        | Dependency-ordered activation, blocking, failure isolation, disable, withdrawal | `packages/sdk/src/host.ts` | `createModuleHost`, `ModuleHost`, `ModuleHostCore`      | `d784c30` |
+| React       | Provider and the three hooks on `useSyncExternalStore`      | `packages/sdk/src/react.tsx`     | `ModuleHostProvider`, `useModule`, `useLive`, `useStoreSelector` | `d784c30` |
+| Entry       | JSDoc'd public exports                                      | `packages/sdk/src/index.ts`      | —                                                       | `d784c30` |
+| Tests       | Behaviour and type coverage for every rule below            | `packages/sdk/src/host.test.ts`, `module.test.ts`, `contract.test.ts`, `react.test.tsx` | — | `d784c30` |
+| Docs        | Package responsibility and public API table                 | `packages/sdk/README.md`         | —                                                       | `d784c30` |
 
 ### Generated or restricted
 
@@ -278,7 +278,7 @@ Everything below was read at `52bddf8`, the T-011 implementation commit.
 
 ## 14. Business Rules
 
-Every rule below is implemented at `52bddf8` and carries a test named for it.
+Every rule below is implemented at `d784c30` and carries a test named for it.
 
 | Rule ID | Status  | Rule                                                                                                        | Enforcement point        | Test reference                        |
 |---------|---------|-------------------------------------------------------------------------------------------------------------|--------------------------|---------------------------------------|
@@ -441,4 +441,4 @@ bun run typecheck
 | Date       | Version | Change                                                                 | Status   | PR or author   |
 |------------|---------|------------------------------------------------------------------------|----------|----------------|
 | 2026-10-11 | 0.1.0   | Initial plan, written in Mode A before coding                          | Planned  | T-011          |
-| 2026-10-11 | 0.1.1   | Implemented and verified at `52bddf8`; the implementation plan removed | Shipped  | T-011 (`52bddf8`) |
+| 2026-10-11 | 0.1.1   | Implemented and verified at `d784c30`; the implementation plan removed | Shipped  | T-011 (`d784c30`) |
