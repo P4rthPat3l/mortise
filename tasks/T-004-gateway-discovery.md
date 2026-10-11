@@ -2,7 +2,7 @@
 id: T-004
 title: "Gateway: discovery and connection state machine"
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-001, T-002, T-003]
 covers: [P1]

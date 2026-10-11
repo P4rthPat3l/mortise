@@ -2,7 +2,7 @@
 id: T-011
 title: Module SDK and FEAT-002
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-010]
 covers: [P5]
@@ -35,11 +35,11 @@ First-party feature modules can be declared, activated in dependency order, depe
 Real feature modules, persistence of declared stores (later), the public extension API (Phase 3).
 
 ## Acceptance criteria
-- [ ] AC-1: FEAT-002 exists, passes the skill's blocking checks, and is in the index.
-- [ ] AC-2: Tests cover activation order, `blocked` → active when the provider returns, failure isolation, withdrawal of contributions on disable, and `Live` transitions.
-- [ ] AC-3: A type test proves that accessing an undeclared dependency does not compile (`// @ts-expect-error`).
-- [ ] AC-4: React hook tests render with `@testing-library/react` under `happy-dom`.
-- [ ] AC-5: `bun run check` passes.
+- [x] AC-1: FEAT-002 exists, passes the skill's blocking checks, and is in the index.
+- [x] AC-2: Tests cover activation order, `blocked` → active when the provider returns, failure isolation, withdrawal of contributions on disable, and `Live` transitions.
+- [x] AC-3: A type test proves that accessing an undeclared dependency does not compile (`// @ts-expect-error`).
+- [x] AC-4: React hook tests render with `@testing-library/react` under `happy-dom`.
+- [x] AC-5: `bun run check` passes.
 
 ## Verification
 ```bash
