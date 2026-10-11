@@ -5,14 +5,14 @@ title: Module system
 # status: proposed | approved | active | superseded | retired
 status: proposed
 # implementation_status: not_started | in_progress | shipped_unverified | shipped_verified | sunsetting
-implementation_status: not_started
+implementation_status: shipped_verified
 owner: Mortise maintainer
 created: 2026-10-11
 last_updated: 2026-10-11
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: null
+last_verified_commit: 52bddf8
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.0
+version: 0.1.1
 tags:
   - modules
   - sdk
@@ -33,7 +33,7 @@ related_features: []
 | Field                 | Details                                                                                              |
 |-----------------------|------------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                              |
-| Implementation status | Not started — FEAT-002 is written in T-011 before any code                                            |
+| Implementation status | Shipped and verified at `52bddf8` (T-011)                                                            |
 | Owner                 | Mortise maintainer                                                                                   |
 | Primary actors        | A first-party feature module (author), the composition root that builds the host, React components    |
 | Trigger               | A module registers with the host at window boot; a provider activates, fails, or is disabled          |
@@ -41,7 +41,7 @@ related_features: []
 | Entry points          | `@mortise/sdk` (`packages/sdk/src/index.ts`): `Module`, `Contract`, `createModuleHost`, hooks         |
 | Data stores           | Declared module stores (in-memory now; persisted in a later phase). No engine data                    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | Not yet verified — no implementation                                                                 |
+| Last verified         | 2026-10-11 at `52bddf8`                                                                              |
 
 **Status legend.** Every `Status` value below is one of: **Current** (read in the code at `last_verified_commit`) · **Planned** (not implemented) · **Inferred** (not directly verified) · **Unknown**.
 
@@ -178,12 +178,12 @@ flowchart TD
 
 | Step                | Status  | Controlling component        | Decision                                            | Failure behavior                                   |
 |---------------------|---------|------------------------------|-----------------------------------------------------|----------------------------------------------------|
-| Ordering            | Planned | `host.ts`                    | Topological order over `requires` edges             | A dependency cycle leaves every member blocked      |
-| Enablement          | Planned | `host.ts`                    | Is the module enabled?                              | `inactive/disabled`; nothing runs                   |
-| Requirement check   | Planned | `host.ts`                    | Is every `requires` contract `active`?              | `inactive/blocked`; resumes later                   |
-| Setup               | Planned | `host.ts`                    | Run the synchronous setup once per activation       | `inactive/failed`; partial scope disposed           |
-| Provider claim      | Planned | `host.ts`                    | One provider per contract token                     | Duplicate claim throws at registration              |
-| Withdrawal          | Planned | `host.ts` + `DisposableScope`| Dispose the scope on leaving `active`               | Registrations and provided values are removed       |
+| Ordering            | Current | `host.ts`                    | Topological order over `requires` edges             | A dependency cycle leaves every member blocked      |
+| Enablement          | Current | `host.ts`                    | Is the module enabled?                              | `inactive/disabled`; nothing runs                   |
+| Requirement check   | Current | `host.ts`                    | Is every `requires` contract `active`?              | `inactive/blocked`; resumes later                   |
+| Setup               | Current | `host.ts`                    | Run the synchronous setup once per activation       | `inactive/failed`; partial scope disposed           |
+| Provider claim      | Current | `host.ts`                    | One provider per contract token                     | Duplicate claim throws at registration              |
+| Withdrawal          | Current | `host.ts` + `DisposableScope`| Dispose the scope on leaving `active`               | Registrations and provided values are removed       |
 
 ## 9. Data Flow
 
@@ -243,7 +243,7 @@ stateDiagram-v2
 | `inactive/disabled`| `{ status: "inactive", reason: "disabled" }` | The host disabled the module, or no provider owns a contract | Nothing runs                     |
 | `inactive/failed` | `{ status: "inactive", reason: "failed" }` | Setup threw. Terminal until re-registration    | A partial scope is disposed                   |
 | `active`          | `{ status: "active", value, generation }` | Setup returned; contributions are owned by the scope | `generation` increments on each activation |
-| `pending`         | `{ status: "pending" }`             | A provider exists but its value is not yet supplied | Transient within one activation pass     |
+| `pending`         | `{ status: "pending" }`             | A provider module is active but has not supplied the value | Setup should supply it; it is not a stable state for a correct module |
 
 `restarting` is part of the `Live` vocabulary for a later phase when a provider is replaced in place;
 the host in this feature reaches `blocked` and then `active` instead. The reason vocabulary is fixed
@@ -253,26 +253,20 @@ now so consumers can match on all four cases today.
 
 ### Existing
 
-Everything below was read while writing this document, but no SDK implementation exists yet, so the
-strongest label available with `last_verified_commit: null` is **Inferred**.
+Everything below was read at `52bddf8`, the T-011 implementation commit.
 
-| Layer       | Responsibility                                         | Repository path                             | Main symbol                                             | Status   |
-|-------------|--------------------------------------------------------|---------------------------------------------|---------------------------------------------------------|----------|
-| Core        | Disposables, registries, store, event bus              | `packages/core/src/`                        | `DisposableScope`, `Registries`, `Registry`, `createStore`, `Store`, `EventBus` | Inferred |
-| Core docs   | Public API table for the primitives the host builds on | `packages/core/README.md`                   | —                                                       | Inferred |
-| SDK entry   | Placeholder public entry point                         | `packages/sdk/src/index.ts`                 | —                                                       | Inferred |
-| Design ref  | Upstream liveness and manifest pattern (read-only)     | `/home/parth/Production/opencode` at v2.0.25 | `Extension.define`, `ctx.uses`, `Live<T>`               | Inferred |
-
-### Planned
-
-| Layer       | Responsibility                                              | Planned path                  | Main symbol                                        | Change type |
-|-------------|-------------------------------------------------------------|-------------------------------|----------------------------------------------------|-------------|
-| Contracts   | Typed contract tokens and their value type                  | `packages/sdk/src/contract.ts`| `Contract`, `ContractValue`                         | Create      |
-| Liveness    | The `Live<T>` union and its inactive reasons                | `packages/sdk/src/live.ts`    | `Live`, `LiveInactiveReason`                        | Create      |
-| Manifest    | `Module.define`, definition and context types, `Setup<D>`, declared stores | `packages/sdk/src/module.ts` | `Module`, `ModuleDefinition`, `ModuleContext`, `Setup`, `Store`, `StoreDefinition` | Create |
-| Host        | Dependency-ordered activation, blocking, failure isolation, disable, withdrawal | `packages/sdk/src/host.ts` | `createModuleHost`, `ModuleHost`, `ModuleHostCore` | Create      |
-| React       | Provider and the three hooks on `useSyncExternalStore`      | `packages/sdk/src/react.tsx`  | `ModuleHostProvider`, `useModule`, `useLive`, `useStoreSelector` | Create      |
-| Entry       | JSDoc'd public exports                                      | `packages/sdk/src/index.ts`   | —                                                  | Change      |
+| Layer       | Responsibility                                              | Repository path                  | Main symbol                                             | Verified  |
+|-------------|-------------------------------------------------------------|----------------------------------|---------------------------------------------------------|-----------|
+| Core        | Disposables, registries, store, event bus                   | `packages/core/src/`             | `DisposableScope`, `Registries`, `Registry`, `createStore`, `Store`, `EventBus` | `52bddf8` |
+| Core docs   | Public API table for the primitives the host builds on      | `packages/core/README.md`        | —                                                       | `52bddf8` |
+| Contracts   | Typed contract tokens and their value type                  | `packages/sdk/src/contract.ts`   | `Contract`, `ContractValue`                             | `52bddf8` |
+| Liveness    | The `Live<T>` union and its inactive reasons                | `packages/sdk/src/live.ts`       | `Live`, `LiveInactiveReason`                            | `52bddf8` |
+| Manifest    | `Module.define`, definition and context types, `Setup<D>`, declared stores | `packages/sdk/src/module.ts` | `Module`, `ModuleInput`, `ModuleDefinition`, `ModuleContext`, `Setup`, `Store`, `StoreDefinition` | `52bddf8` |
+| Host        | Dependency-ordered activation, blocking, failure isolation, disable, withdrawal | `packages/sdk/src/host.ts` | `createModuleHost`, `ModuleHost`, `ModuleHostCore`      | `52bddf8` |
+| React       | Provider and the three hooks on `useSyncExternalStore`      | `packages/sdk/src/react.tsx`     | `ModuleHostProvider`, `useModule`, `useLive`, `useStoreSelector` | `52bddf8` |
+| Entry       | JSDoc'd public exports                                      | `packages/sdk/src/index.ts`      | —                                                       | `52bddf8` |
+| Tests       | Behaviour and type coverage for every rule below            | `packages/sdk/src/host.test.ts`, `module.test.ts`, `contract.test.ts`, `react.test.tsx` | — | `52bddf8` |
+| Docs        | Package responsibility and public API table                 | `packages/sdk/README.md`         | —                                                       | `52bddf8` |
 
 ### Generated or restricted
 
@@ -284,33 +278,32 @@ strongest label available with `last_verified_commit: null` is **Inferred**.
 
 ## 14. Business Rules
 
-Every rule below is **Planned** until the implementation commit; the Mode D pass replaces the label
-with the commit and names the test.
+Every rule below is implemented at `52bddf8` and carries a test named for it.
 
 | Rule ID | Status  | Rule                                                                                                        | Enforcement point        | Test reference                        |
 |---------|---------|-------------------------------------------------------------------------------------------------------------|--------------------------|---------------------------------------|
-| BR-001  | Planned | A module reads only the dependencies it declared; an undeclared key is a compile error.                     | `module.ts` context types | `module.test.ts` (BR-001)             |
-| BR-002  | Planned | A provider activates before any module that requires it; the host orders by `requires` edges.               | `host.ts`                | `host.test.ts` (BR-002)               |
-| BR-003  | Planned | A module with an unavailable required provider is `inactive/blocked` and activates when every one is active. | `host.ts`                | `host.test.ts` (BR-003)               |
-| BR-004  | Planned | An optional provider never blocks; `ctx.uses.name` is a `Live<T>` that degrades.                            | `host.ts`                | `host.test.ts` (BR-004)               |
-| BR-005  | Planned | A setup that throws, or returns a thenable, marks only that module `inactive/failed`; every other module keeps its state. | `host.ts` | `host.test.ts` (BR-005)             |
-| BR-006  | Planned | Leaving `active` disposes the module's scope: contributions and provided values are withdrawn.              | `host.ts`                | `host.test.ts` (BR-006)               |
-| BR-007  | Planned | Two modules may not provide the same contract token; the second registration throws.                        | `host.ts`                | `host.test.ts` (BR-007)               |
-| BR-008  | Planned | Each activation increments `generation`; an `active` `Live` carries the provider's current generation.      | `host.ts`                | `host.test.ts` (BR-008)               |
-| BR-009  | Planned | The host names no module; it activates by declaration and orders by `requires`.                             | `host.ts`                | `host.test.ts` (BR-009)               |
-| BR-010  | Planned | A contract with no provider is `inactive/disabled`; it never reports a value.                               | `host.ts`                | `host.test.ts` (BR-010)               |
+| BR-001  | Current | A module reads only the dependencies it declared; an undeclared key is a compile error.                     | `module.ts` context types | `module.test.ts` (BR-001), compiled by `bun run typecheck` |
+| BR-002  | Current | A provider activates before any module that requires it; the host orders by `requires` edges.               | `host.ts`                | `host.test.ts` (BR-002)               |
+| BR-003  | Current | A module with an unavailable required provider is `inactive/blocked` and activates when every one is active. | `host.ts`                | `host.test.ts` (BR-003)               |
+| BR-004  | Current | An optional provider never blocks; `ctx.uses.name` is a `Live<T>` that degrades.                            | `host.ts`                | `host.test.ts` (BR-004)               |
+| BR-005  | Current | A setup that throws, or returns a thenable, marks only that module `inactive/failed`; every other module keeps its state. | `host.ts` | `host.test.ts` (BR-005, CASE-002) |
+| BR-006  | Current | Leaving `active` disposes the module's scope: contributions and provided values are withdrawn.              | `host.ts`                | `host.test.ts` (BR-006)               |
+| BR-007  | Current | Two modules may not provide the same contract token; the second registration throws.                        | `host.ts`                | `host.test.ts` (BR-007)               |
+| BR-008  | Current | Each activation increments `generation`; an `active` `Live` carries the provider's current generation.      | `host.ts`                | `host.test.ts` (BR-008)               |
+| BR-009  | Current | The host names no module; it activates by declaration and orders by `requires`.                             | `host.ts`                | `host.test.ts` (BR-009)               |
+| BR-010  | Current | A contract with no provider is `inactive/disabled`; a declared but unprovided contract is `pending`.        | `host.ts`                | `host.test.ts` (BR-010)               |
 
 ## 15. Acceptance Criteria
 
-### AC-001: The feature document exists — Status: **Planned**
+### AC-001: The feature document exists — Status: **Current**
 
 **Given** the repository
 **When** the feature-document quality gate runs
 **Then** FEAT-002 exists, passes the blocking checks, and appears in `docs/features/_index.md`.
 
-Untested as code; checked by the Mode D pass and the review.
+Checked by the Mode D pass and review; there is no code test for a document.
 
-### AC-002: Activation order — Status: **Planned**
+### AC-002: Activation order — Status: **Current**
 
 **Given** a provider of `Greeting` and a consumer that requires it, registered consumer-first
 **When** both are registered
@@ -319,7 +312,7 @@ Untested as code; checked by the Mode D pass and the review.
 
 Test: `packages/sdk/src/host.test.ts` (BR-002, BR-009).
 
-### AC-003: Blocked resumes — Status: **Planned**
+### AC-003: Blocked resumes — Status: **Current**
 
 **Given** only the consumer is registered
 **When** the host evaluates it
@@ -328,7 +321,7 @@ Test: `packages/sdk/src/host.test.ts` (BR-002, BR-009).
 
 Test: `packages/sdk/src/host.test.ts` (BR-003).
 
-### AC-004: Failure isolation — Status: **Planned**
+### AC-004: Failure isolation — Status: **Current**
 
 **Given** a module whose setup throws and a healthy module
 **When** both are registered
@@ -337,7 +330,7 @@ Test: `packages/sdk/src/host.test.ts` (BR-003).
 
 Test: `packages/sdk/src/host.test.ts` (BR-005).
 
-### AC-005: Withdrawal on disable — Status: **Planned**
+### AC-005: Withdrawal on disable — Status: **Current**
 
 **Given** an active provider and consumer, with the provider's contribution in a registry
 **When** the provider is disabled
@@ -345,7 +338,7 @@ Test: `packages/sdk/src/host.test.ts` (BR-005).
 
 Test: `packages/sdk/src/host.test.ts` (BR-006).
 
-### AC-006: Live transitions — Status: **Planned**
+### AC-006: Live transitions — Status: **Current**
 
 **Given** no provider for `Greeting`
 **When** the provider registers, is disabled, and is re-enabled
@@ -354,7 +347,7 @@ Test: `packages/sdk/src/host.test.ts` (BR-006).
 
 Test: `packages/sdk/src/host.test.ts` (BR-008, BR-010).
 
-### AC-007: Undeclared dependency fails to compile — Status: **Planned**
+### AC-007: Undeclared dependency fails to compile — Status: **Current**
 
 **Given** a module whose `uses` is empty
 **When** a setup reads `ctx.uses.undeclared`
@@ -362,7 +355,7 @@ Test: `packages/sdk/src/host.test.ts` (BR-008, BR-010).
 
 Test: `packages/sdk/src/module.test.ts` (BR-001) compiled by `bun run typecheck`.
 
-### AC-008: React hooks render — Status: **Planned**
+### AC-008: React hooks render — Status: **Current**
 
 **Given** a host and a component under `ModuleHostProvider`
 **When** the component reads `useModule`, `useLive` and `useStoreSelector`
@@ -389,7 +382,7 @@ security boundary.
 
 | ID      | Requirement                                                                 | Enforcement                          | Validation                                          |
 |---------|------------------------------------------------------------------------------|--------------------------------------|-----------------------------------------------------|
-| SEC-001 | The SDK never gives a module engine credentials or agent authority.           | The host passes only core services and contract values; no transport or credential type is in scope. | Code review; `bun run check:deps` blocks `@opencode/*` |
+| SEC-001 | The SDK never gives a module engine credentials or agent authority.           | The host passes only core services and contract values; no transport or credential type is in scope. | Current: `bun run check:deps` passes; the package imports only `core`, `domain` and `react`. |
 | SEC-002 | A module cannot answer a permission request or bypass the gateway.            | Permissions travel through the gateway and adapter contracts, never through this SDK. | Out of scope; ADR-0011, ADR-0004                     |
 
 ## 20. Testing
@@ -407,28 +400,6 @@ bun run check
 bun run test
 bun run typecheck
 ```
-
-## 24. Implementation Plan
-
-### Phase 1: Contracts, liveness and the manifest
-
-- **Changes:** `contract.ts`, `live.ts`, `module.ts`. `Contract.define<T>`, the `Live<T>` union, and
-  `Module.define` with `ModuleContext<D>` and `Setup<D>` so undeclared reads fail to compile.
-- **Validation:** `module.test.ts` type test; `bun run typecheck`.
-- **Done when:** AC-007 passes and the manifest types compile for a two-module fixture.
-
-### Phase 2: The host
-
-- **Changes:** `host.ts`, `createModuleHost` with ordering, blocking, failure isolation, disable and
-  withdrawal, plus `get` and `module` returning cached `Live` values.
-- **Validation:** `host.test.ts` covers AC-002..AC-006 and the edge cases.
-- **Done when:** every host acceptance criterion passes.
-
-### Phase 3: React bindings
-
-- **Changes:** `react.tsx`, `ModuleHostProvider` and the three hooks on `useSyncExternalStore`.
-- **Validation:** `react.test.tsx` under happy-dom.
-- **Done when:** AC-008 passes and `bun run check` is green.
 
 ## 26. Risks and Limitations
 
@@ -467,6 +438,7 @@ bun run typecheck
 
 ## 30. Changelog
 
-| Date       | Version | Change                                       | Status  | PR or author |
-|------------|---------|----------------------------------------------|---------|--------------|
-| 2026-10-11 | 0.1.0   | Initial plan, written in Mode A before coding | Planned | T-011        |
+| Date       | Version | Change                                                                 | Status   | PR or author   |
+|------------|---------|------------------------------------------------------------------------|----------|----------------|
+| 2026-10-11 | 0.1.0   | Initial plan, written in Mode A before coding                          | Planned  | T-011          |
+| 2026-10-11 | 0.1.1   | Implemented and verified at `52bddf8`; the implementation plan removed | Shipped  | T-011 (`52bddf8`) |
