@@ -32,6 +32,32 @@ export interface FakeProvider {
   stop: () => Promise<void>
 }
 
+/**
+ * The `opencode.json` body that points one engine at {@link startFakeProvider}. Exported so the
+ * fixture recorder and the integration tests configure the scripted provider the same way.
+ */
+export function fakeProviderConfig(baseURL: string, model = "fake/fake-model"): Record<string, unknown> {
+  const [providerID, modelID] = model.split("/")
+  return {
+    update: "disable",
+    model,
+    providers: {
+      [providerID ?? "fake"]: {
+        name: "Fake provider",
+        package: "@opencode/ai/providers/openai-compatible",
+        settings: { baseURL: `${baseURL}/v1`, apiKey: "fake-provider-key" },
+        models: {
+          [modelID ?? "fake-model"]: {
+            name: "Fake Model",
+            capabilities: { tools: true, input: ["text"], output: ["text"] },
+            limit: { context: 100_000, output: 4_096 },
+          },
+        },
+      },
+    },
+  }
+}
+
 /** Starts the scripted provider and resolves once it is listening. */
 export async function startFakeProvider(options: FakeProviderOptions = {}): Promise<FakeProvider> {
   const server = createServer((request, response) => void handle(request, response))

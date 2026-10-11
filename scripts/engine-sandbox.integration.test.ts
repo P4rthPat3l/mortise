@@ -47,7 +47,7 @@ describe.skipIf(!process.env.MORTISE_INTEGRATION)("engine sandbox", () => {
       expect(payload.version).toMatch(/^2\./)
       expect(payload.pid).toBe(sandbox.pid)
     } finally {
-      await sandbox.stop()
+      await sandbox.dispose()
     }
     expect(isAlive(sandbox.pid)).toBe(false)
   })
@@ -58,7 +58,7 @@ describe.skipIf(!process.env.MORTISE_INTEGRATION)("engine sandbox", () => {
     try {
       await info(sandbox)
     } finally {
-      await sandbox.stop()
+      await sandbox.dispose()
     }
     const after = await readIfExists(SERVICE_JSON)
     expect(after).toEqual(before)

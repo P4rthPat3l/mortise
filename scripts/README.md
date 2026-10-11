@@ -14,14 +14,16 @@ Development scripts that run under Bun or Node: the isolated engine sandbox, fix
 import { startSandbox } from "./engine-sandbox"
 
 const sandbox = await startSandbox({ binary: "installed" })
-// sandbox.url, sandbox.password, sandbox.pid, sandbox.dirs, sandbox.stop()
+// sandbox.url, sandbox.password, sandbox.pid, sandbox.dirs, sandbox.stop(), sandbox.dispose()
 ```
 
 - `binary` defaults to `"bunx"`, which runs `bunx @opencode/cli@<version>` (`version` defaults to `2.0.26`). `"installed"` runs `~/.opencode/bin/opencode`, falling back to `opencode` on `PATH`. `{ path }` runs one executable directly; `resolveSandboxBinary(version)` returns the npm-installed binary under `.sandbox/cli-<version>/` when present, which fetches only this platform's optional package unlike `bunx`.
 - Every start runs `<binary> --version` and refuses to continue unless it reports `opencode v2.`, so a v1 binary on `PATH` fails loudly.
-- `stop()` kills the whole process tree; the same happens on process exit.
+- `service: true` runs `serve --service` and waits for the registration file at `serviceRegistrationFile(sandbox.dirs)` (`$XDG_STATE_HOME/opencode/service.json`). The password is written to the sandbox's service config so discovery can read it from the registration.
+- `stateDir` points a second `--service` engine at another sandbox's `XDG_STATE_HOME`, so it replaces the registration (T-013). `reuse` restarts an engine against the same tree and `OPENCODE_DB` (T-013).
+- `stop()` kills the whole process tree; the same happens on process exit. `dispose()` also removes the temporary tree.
 
-Run `bun scripts/engine-sandbox.ts [--version 2.0.20] [--binary installed]` to start one and keep it up until Ctrl-C.
+Run `bun scripts/engine-sandbox.ts [--version 2.0.20] [--binary installed] [--service]` to start one and keep it up until Ctrl-C.
 
 ## Fake provider and fixtures
 

@@ -26,7 +26,7 @@ import {
   type SandboxBinary,
   startSandbox,
 } from "./engine-sandbox"
-import { startFakeProvider } from "./fake-provider"
+import { fakeProviderConfig, startFakeProvider } from "./fake-provider"
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const FIXTURES_ROOT = join(REPO_ROOT, "packages", "engine-opencode", "fixtures")
@@ -44,7 +44,7 @@ async function main(options: Options): Promise<void> {
   const sandbox = await startSandbox({
     binary,
     version: options.version,
-    config: providerConfig(provider.url),
+    config: fakeProviderConfig(provider.url),
   })
 
   try {
@@ -108,27 +108,6 @@ async function chooseBinary(options: Options): Promise<SandboxBinary> {
   // Prefer the local binary when it is the exact engine we are recording, so a run
   // does not download the whole CLI. Otherwise pin through `bunx`.
   return installedVersion === options.version ? "installed" : "bunx"
-}
-
-function providerConfig(baseURL: string): Record<string, unknown> {
-  return {
-    update: "disable",
-    model: "fake/fake-model",
-    providers: {
-      fake: {
-        name: "Fake provider",
-        package: "@opencode/ai/providers/openai-compatible",
-        settings: { baseURL: `${baseURL}/v1`, apiKey: "fake-provider-key" },
-        models: {
-          "fake-model": {
-            name: "Fake Model",
-            capabilities: { tools: true, input: ["text"], output: ["text"] },
-            limit: { context: 100_000, output: 4_096 },
-          },
-        },
-      },
-    },
-  }
 }
 
 async function collectTurn(sandbox: { url: string }, auth: string, sessionID: string): Promise<unknown[]> {

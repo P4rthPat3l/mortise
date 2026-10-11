@@ -12,7 +12,7 @@
 import { type ChildProcess, spawn } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { accessSync, constants, existsSync } from "node:fs"
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { homedir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
@@ -38,6 +38,22 @@ export interface SandboxOptions {
   port?: number
   /** Contents of the sandbox's `opencode.json`. Defaults to disabling self-update. */
   config?: Record<string, unknown>
+  /**
+   * Run `serve --service`, so the engine registers in the sandbox's `XDG_STATE_HOME` and shuts
+   * itself down when another service replaces the registration. Defaults to `false`: a plain
+   * `serve` that never registers.
+   */
+  service?: boolean
+  /**
+   * Reuse an existing tree instead of creating a fresh one, so a restarted engine sees the same
+   * `OPENCODE_DB` and config (T-013 resync test). `config` is not rewritten unless supplied.
+   */
+  reuse?: SandboxDirs
+  /**
+   * Use another sandbox's `XDG_STATE_HOME` while keeping fresh data, config and home directories.
+   * A second `--service` engine started this way replaces the first registration (T-013).
+   */
+  stateDir?: string
 }
 
 export interface SandboxDirs {
@@ -58,6 +74,16 @@ export interface Sandbox {
   dirs: SandboxDirs
   /** Kills the engine process tree. Safe to call more than once. */
   stop: () => Promise<void>
+  /** Stops the engine and removes its temporary tree. Safe to call more than once. */
+  dispose: () => Promise<void>
+}
+
+/**
+ * The registration file a `--service` engine writes under the sandbox's `XDG_STATE_HOME`
+ * (`$XDG_STATE_HOME/opencode/service.json`). Point discovery at this path, never at the user's.
+ */
+export function serviceRegistrationFile(dirs: SandboxDirs): string {
+  return join(dirs.state, "opencode", "service.json")
 }
 
 /**
@@ -102,6 +128,7 @@ export async function startSandbox(options: SandboxOptions = {}): Promise<Sandbo
   const binary = options.binary ?? "bunx"
   const version = options.version ?? DEFAULT_VERSION
   const command = sandboxCommand(binary, version)
+  const service = options.service ?? false
 
   const reported = await readVersion(command)
   if (reported === undefined) {
@@ -109,19 +136,38 @@ export async function startSandbox(options: SandboxOptions = {}): Promise<Sandbo
   }
 
   const port = options.port ?? (await findFreePort())
-  const dirs = await createDirs()
+  // A copy keeps `dirs` mutable for the `stateDir` override without touching a reused sandbox.
+  const dirs: SandboxDirs = { ...(options.reuse ?? (await createDirs())) }
+  if (options.stateDir !== undefined) dirs.state = options.stateDir
+  await Promise.all(Object.values(dirs).map((dir) => mkdir(dir, { recursive: true })))
   const password = randomBytes(24).toString("base64url")
 
-  await mkdir(join(dirs.config, "opencode"), { recursive: true })
-  await writeFile(
-    join(dirs.config, "opencode", "opencode.json"),
-    `${JSON.stringify(options.config ?? { update: "disable" }, null, 2)}\n`,
-    "utf8",
-  )
+  // A plain engine keeps only the caller's config; a service keeps its password in the service
+  // config file so the engine reuses it across restarts instead of generating a new one.
+  if (options.reuse === undefined || options.config !== undefined) {
+    await mkdir(join(dirs.config, "opencode"), { recursive: true })
+    await writeFile(
+      join(dirs.config, "opencode", "opencode.json"),
+      `${JSON.stringify(options.config ?? { update: "disable" }, null, 2)}\n`,
+      "utf8",
+    )
+  }
+  if (service) {
+    await mkdir(join(dirs.config, "opencode"), { recursive: true })
+    await writeFile(join(dirs.config, "opencode", "service.json"), `${JSON.stringify({ password })}\n`, "utf8")
+  }
 
   const child = spawn(
     command[0] as string,
-    [...command.slice(1), "serve", "--hostname", "127.0.0.1", "--port", String(port)],
+    [
+      ...command.slice(1),
+      "serve",
+      ...(service ? ["--service"] : []),
+      "--hostname",
+      "127.0.0.1",
+      "--port",
+      String(port),
+    ],
     {
       cwd: dirs.work,
       env: sandboxEnv(dirs, password),
@@ -148,6 +194,8 @@ export async function startSandbox(options: SandboxOptions = {}): Promise<Sandbo
       () => exited,
       () => log,
     )
+    // A service is only joinable once its registration exists; discovery reads that file.
+    if (service) await waitForRegistration(dirs, child.pid ?? -1, () => log)
   } catch (error) {
     untrack(child)
     await terminate(child)
@@ -159,7 +207,17 @@ export async function startSandbox(options: SandboxOptions = {}): Promise<Sandbo
     await terminate(child)
   })
 
-  return { url, password, pid: child.pid ?? -1, dirs, stop }
+  return {
+    url,
+    password,
+    pid: child.pid ?? -1,
+    dirs,
+    stop,
+    dispose: async () => {
+      await stop()
+      await rm(dirs.root, { recursive: true, force: true })
+    },
+  }
 }
 
 async function createDirs(): Promise<SandboxDirs> {
@@ -227,6 +285,21 @@ async function waitForReady(
 
 function basicAuth(password: string): string {
   return `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`
+}
+
+/** Waits until the service has written its registration for the process we started. */
+async function waitForRegistration(dirs: SandboxDirs, pid: number, log: () => string): Promise<void> {
+  const file = serviceRegistrationFile(dirs)
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const text = await readFile(file, "utf8").catch(() => undefined)
+    if (text !== undefined) {
+      const info = JSON.parse(text) as { readonly pid?: unknown }
+      if (info.pid === pid) return
+    }
+    await sleep(100)
+  }
+  throw new Error(`Service did not register ${file} within 30s.\n${log()}`)
 }
 
 function which(name: string): string | undefined {
@@ -331,13 +404,14 @@ function once<A>(fn: () => Promise<A>): () => Promise<A> {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-function parseArgs(argv: readonly string[]): { version?: string; port?: number; binary?: SandboxBinary } {
-  const options: { version?: string; port?: number; binary?: SandboxBinary } = {}
+function parseArgs(argv: readonly string[]): SandboxOptions {
+  const options: SandboxOptions = {}
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--version") options.version = argv[++index]
     else if (arg === "--port") options.port = Number(argv[++index])
     else if (arg === "--binary") options.binary = parseSandboxBinary(argv[++index])
+    else if (arg === "--service") options.service = true
   }
   return options
 }
