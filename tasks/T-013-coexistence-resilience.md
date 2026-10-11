@@ -2,7 +2,7 @@
 id: T-013
 title: Coexistence and resilience tests
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-005, T-007, T-008]
 covers: [P1, P2]

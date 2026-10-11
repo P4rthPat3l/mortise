@@ -37,7 +37,7 @@ Goal: prove the decisions that are hardest to reverse (P1 to P8 in `docs/archite
 | [T-010](T-010-core-services.md) | Core: registries, commands, keybindings, settings, store | sonnet | T-001 | P5 | done |
 | [T-011](T-011-module-sdk.md) | Module SDK and FEAT-002 | sonnet | T-010 | P5 | done |
 | [T-012](T-012-workbench-timeline.md) | Workbench composition root and streaming timeline | sonnet | T-008, T-009, T-011 | P3, P4, P8 | todo |
-| [T-013](T-013-coexistence-resilience.md) | Coexistence and resilience tests | sonnet | T-005, T-007, T-008 | P1, P2 | ready |
+| [T-013](T-013-coexistence-resilience.md) | Coexistence and resilience tests | sonnet | T-005, T-007, T-008 | P1, P2 | done |
 | [T-014](T-014-version-matrix.md) | Engine version matrix in CI | haiku | T-007, T-008 | P7 | done |
 | [T-015](T-015-extension-sandbox-spike.md) | Sandboxed extension spike | opus | T-009 | P6 | todo |
 | [T-016](T-016-phase0-exit-review.md) | Phase 0 exit review and Phase 1 backlog | opus | T-001 to T-015 | P1 to P8 | todo |
