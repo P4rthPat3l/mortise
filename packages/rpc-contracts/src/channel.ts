@@ -259,8 +259,15 @@ export function createServer(transport: Transport, handlers: Partial<MethodHandl
         return
       }
       reply(id, name, { payload: parsedOutput.data })
-    } catch {
-      reply(id, name, { error: { code: "internal", message: "handler failed" } })
+    } catch (error) {
+      // A handler may signal its own failure with a ChannelError — the forwarding boundary throws
+      // `forbidden_path`, `engine_unreachable` and `timeout`. Keep that code so a caller can tell an
+      // engine problem from a bug; anything else stays opaque (FEAT-001 §16).
+      if (error instanceof ChannelError) {
+        reply(id, name, { error: { code: error.code, message: error.message } })
+      } else {
+        reply(id, name, { error: { code: "internal", message: "handler failed" } })
+      }
     }
   }
 

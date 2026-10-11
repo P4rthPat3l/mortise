@@ -171,6 +171,27 @@ describe("channel failures", () => {
     await expect(rawRequest("connection.get", { serverId: shared })).rejects.toMatchObject({ code: "invalid_output" })
   })
 
+  it("AC-2: a handler that throws a ChannelError keeps its code and message", async () => {
+    const { rawRequest } = setup({
+      "connection.get": () => {
+        throw new ChannelError("engine_unreachable", "no engine is connected")
+      },
+    })
+    await expect(rawRequest("connection.get", { serverId: shared })).rejects.toMatchObject({
+      code: "engine_unreachable",
+      message: "no engine is connected",
+    })
+  })
+
+  it("AC-2: a handler that throws an ordinary error rejects with internal", async () => {
+    const { rawRequest } = setup({
+      "connection.get": () => {
+        throw new Error("boom")
+      },
+    })
+    await expect(rawRequest("connection.get", { serverId: shared })).rejects.toMatchObject({ code: "internal" })
+  })
+
   it("AC-2: emit rejects a payload that violates the event schema", () => {
     const { server } = setup(handlers)
     expect(() => server.emit("connection.changed", { serverId: shared, state: { phase: "bogus" } } as never)).toThrow(
