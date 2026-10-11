@@ -40,6 +40,12 @@ export {
   type StreamConnectionReporter,
 } from "./events.js"
 export {
+  createForwardHandler,
+  FORWARD_TIMEOUT_MS,
+  type ForwardConnectionReporter,
+  type ForwardDeps,
+} from "./forward.js"
+export {
   type ConnectionChange,
   createGateway,
   type Gateway,
