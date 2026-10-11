@@ -39,7 +39,7 @@ module `failed`; leaving `active` disposes the module's scope with everything it
 | --- | --- | --- |
 | `contract.ts` | `Contract`, `ContractValue` | Typed contract tokens (`Contract.define<T>(id)`) and their value type. |
 | `live.ts` | `Live`, `LiveInactiveReason` | Liveness: `pending`, `active` (with `generation`), or `inactive` with a reason. |
-| `module.ts` | `Module`, `ModuleInput`, `ModuleDefinition`, `ModuleContext`, `Setup`, `ProvidesOf`, `UsesOf`, `RequiresOf`, `StoresOf`, `UsesContext`, `RequiresContext`, `StoresContext`, `Store`, `StoreDefinition`, `StoreValue`, `Contracts`, `NoKeys` | The manifest, the typed setup context and declared stores. |
+| `module.ts` | `Module`, `ModuleInput`, `ModuleDefinition`, `ModuleContext`, `Setup`, `ProvidesOf`, `UsesOf`, `RequiresOf`, `StoresOf`, `UsesContext`, `RequiresContext`, `StoresContext`, `Store`, `StoreDefinition`, `StoreValue`, `Contracts` | The manifest, the typed setup context and declared stores. |
 | `host.ts` | `createModuleHost`, `ModuleHost`, `ModuleHostCore` | Dependency-ordered activation, blocking, failure isolation, disable and withdrawal. |
 | `react.tsx` | `ModuleHostProvider`, `useModule`, `useLive`, `useStoreSelector` | React bindings on `useSyncExternalStore`. |
 
