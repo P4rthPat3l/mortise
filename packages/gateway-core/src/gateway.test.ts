@@ -13,6 +13,14 @@ const ENDPOINT: ServiceEndpoint = {
 
 const INFO = { version: "2.0.26", pid: 7, capabilities: { persistentPty: true } }
 
+async function waitFor(predicate: () => boolean, label: string, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}`)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+}
+
 interface Capture {
   readonly gateway: Gateway
   readonly changes: ConnectionChange[]
@@ -86,5 +94,30 @@ describe("gateway composition", () => {
 
     expect(harness.gateway.internal.endpoint()?.auth?.password).toBe("s3cr3t-password")
     expect(harness.gateway.internal.info()?.version).toBe("2.0.26")
+  })
+
+  it("§16 / AC-004: a 401 on the event stream reports unauthorized through the connection machine", async () => {
+    const discovery: Discovery = {
+      discover: async () => ENDPOINT,
+      findOrStart: async () => ({ kind: "found", endpoint: ENDPOINT }),
+    }
+    const sink: LogSink = { write: () => undefined }
+    // The fake responds to the probe, then refuses the stream. The password never changes, so the
+    // machine stays in `unauthorized` (the forwarding half is T-006).
+    const fetch: typeof globalThis.fetch = async (input) => {
+      const url = input instanceof URL ? input.href : typeof input === "string" ? input : input.url
+      if (url.endsWith("/api/info")) return new Response(JSON.stringify(INFO), { status: 200 })
+      if (url.endsWith("/openapi.json")) return new Response(JSON.stringify({ paths: {} }), { status: 200 })
+      if (url.endsWith("/api/event")) return new Response(null, { status: 401 })
+      return new Response("nope", { status: 404 })
+    }
+    const gateway = createGateway({ serverId: SERVER, discovery, fetch, logger: createLogger(sink) })
+    // A window must be listening before the upstream opens (CASE-013).
+    const unsubscribe = gateway.internal.events.subscribe(() => undefined)
+    await gateway.start()
+    await waitFor(() => gateway.connection(SERVER).phase === "unauthorized", "unauthorized")
+    expect(gateway.internal.events.generation()).toBe(0)
+    unsubscribe()
+    gateway.dispose()
   })
 })

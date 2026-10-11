@@ -8,11 +8,11 @@ status: proposed
 implementation_status: in_progress
 owner: Mortise maintainers
 created: 2026-10-10
-last_updated: 2026-10-10
+last_updated: 2026-10-11
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 0dc10a7
+last_verified_commit: 4323cc7
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.2
+version: 0.1.3
 tags:
   - gateway
   - engine
@@ -32,7 +32,7 @@ related_features: []
 | Field                 | Details                                                                                             |
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                             |
-| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine) implemented          |
+| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine) and the T-005 event stream implemented |
 | Owner                 | Mortise maintainers                                                                                  |
 | Primary actors        | User, renderer window, gateway (main process), OpenCode service, other clients (official app, TUI)   |
 | Trigger               | Application start; a window opening; a connection state change; a renderer request or subscription   |
@@ -41,7 +41,7 @@ related_features: []
 | Data stores           | Engine server list in client SQLite; engine password in main memory now, OS keychain later           |
 | External systems      | OpenCode v2 engine (`opencode serve --service`), registration file via `@opencode/client/service`    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | T-004 code read at `1d4669d`; the rest (§11 Planned rows, §24 phases 2–4) has no code yet            |
+| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`. Forwarding (T-006) and the desktop host (T-009) have no code yet |
 
 ### At a Glance
 
@@ -54,16 +54,17 @@ gateway adds Basic auth and forwards them, so the password never leaves the main
 
 **Sections 1–23 and 30 describe planned behaviour. Section 24 is the phased implementation plan and
 maps to tasks T-004, T-005, T-006 and T-009. Phase 1 (T-004: discovery, probe, capabilities and the
-connection state machine) is implemented at `1d4669d`; the rows it owns are labeled `Current`. Event
-streaming, forwarding and the desktop host have no code yet, so nothing else is `Current`.**
+connection state machine) is implemented at `1d4669d`; Phase 2 (T-005: the event stream, batching and
+resync) is implemented at `4323cc7`. The rows they own are labeled `Current`. Forwarding (T-006) and
+the desktop host (T-009) have no code yet, so nothing else is `Current`.**
 
 ### Status Legend
 
 Every `Status` value in this document is one of these four. They describe how much trust a statement
 has earned, independent of the document and implementation statuses above.
 
-- **Current**: implemented, and read in the code at `last_verified_commit`. **Not used in this
-  document** — `last_verified_commit` is `null` because no Mortise code exists.
+- **Current**: implemented, and read in the code at `last_verified_commit`. Used for the T-004 rows
+  (read at `1d4669d`) and the T-005 event stream (read at `4323cc7`).
 - **Planned**: proposed or approved, but not implemented.
 - **Inferred**: consistent with the evidence, but not directly verified against Mortise code.
 - **Unknown**: unresolved. Tracked in §28.
@@ -228,10 +229,10 @@ flowchart TD
 
 | Step                    | Status  | Controlling component        | Decision                                        | Failure behavior                                      |
 |-------------------------|---------|------------------------------|-------------------------------------------------|-------------------------------------------------------|
-| Discovery               | Planned | `discovery.ts`               | Whether a ready registration exists             | No registration falls through to start policy         |
-| Start policy            | Planned | `discovery.ts` + `connection.ts` | Start only if allowed and CLI installed     | `no-engine`; no spawn                                 |
-| Support computation     | Planned | `probe.ts` + `capabilities.ts` | Range check and capability set                | `incompatible` or `untested`; never a silent downgrade |
-| Stream admission        | Planned | `events.ts`                  | First event must be `server.connected`          | Reconnect and log an error                            |
+| Discovery               | Current | `discovery.ts`               | Whether a ready registration exists             | No registration falls through to start policy         |
+| Start policy            | Current | `discovery.ts` + `connection.ts` | Start only if allowed and CLI installed     | `no-engine`; no spawn                                 |
+| Support computation     | Current | `probe.ts` + `capabilities.ts` | Range check and capability set                | `incompatible` or `untested`; never a silent downgrade |
+| Stream admission        | Current | `events.ts`                  | First event must be `server.connected`          | Reconnect and log an error                            |
 | Forwarding authorization| Planned | `forward.ts`                 | Path allowlist and header rules                 | `forbidden_path`                                      |
 | Auth injection          | Planned | `forward.ts`                 | Add Basic auth, strip `set-cookie`              | Map to `engine_unreachable` or `timeout`              |
 
@@ -302,9 +303,9 @@ sequenceDiagram
 
 | Stage     | Status  | Input                          | Transformation                                             | Output                          |
 |-----------|---------|--------------------------------|------------------------------------------------------------|---------------------------------|
-| Discovery | Planned | Registration file              | Read through `client/service`; classify state and version  | Endpoint plus service descriptor |
-| Probe     | Planned | `GET /api/info`, `/openapi.json` | Range compare, capability derivation, cache per version  | `EngineInfo` with support state |
-| Stream    | Planned | SSE frames                    | Frame parse, JSON parse for `type`, batch by interval      | `engine.events` batches         |
+| Discovery | Current | Registration file              | Read through `client/service`; classify state and version  | Endpoint plus service descriptor |
+| Probe     | Current | `GET /api/info`, `/openapi.json` | Range compare, capability derivation, cache per version  | `EngineInfo` with support state |
+| Stream    | Current | SSE frames                    | Frame parse, JSON parse for `type`, batch by interval      | `engine.events` batches         |
 | Forward   | Planned | `engine.fetch` message         | Validate, inject Basic auth, classify body, strip headers  | Forwarded response or channel error |
 
 ### Sensitive Data
@@ -361,14 +362,17 @@ The gateway never emits `hydrating`: per Q-001 in §28, the gateway goes `connec
 `/api/info` succeeds and the event stream delivers `server.connected`, and `resyncing → live` after a
 reconnect. `hydrating` is a per-window phase the workbench composition root (T-012) shows from the
 moment it sees `live` or `engine.resync` until its snapshots load. `connection.ts` implements every
-other transition at `1d4669d`; the event stream (T-005) reports in through `onStreamConnected` and
-`onStreamLost`.
+other transition at `1d4669d`; the event stream (`events.ts`, T-005) reports in through
+`onStreamConnected` and `onStreamLost(reason)`, and reports a stream `401` through `onUnauthorized`.
+The upstream only runs while a service is adopted and at least one subscriber is listening, so the
+last window closing closes it without a state change (CASE-013).
 
 ## 11. Implementation Map
 
 ### Existing Artifacts
 
-Everything below was read at `1d4669d`, the T-004 implementation commit.
+Rows were read at the commit in the `Verified` column: the T-004 rows at `1d4669d`, the T-005 rows
+at `4323cc7`.
 
 | Layer        | Responsibility                              | Repository path                             | Main symbol                                                        | Verified  |
 |--------------|---------------------------------------------|---------------------------------------------|--------------------------------------------------------------------|-----------|
@@ -378,15 +382,15 @@ Everything below was read at `1d4669d`, the T-004 implementation commit.
 | Probe        | `/api/info` probe and support state         | `packages/gateway-core/src/probe.ts`        | `probeInfo`, `supportState`                                        | `1d4669d` |
 | Capabilities | Capability derivation, cached per version   | `packages/gateway-core/src/capabilities.ts` | `deriveCapabilities`, `createCapabilityCache`                      | `1d4669d` |
 | Connection   | Connection state machine                    | `packages/gateway-core/src/connection.ts`   | `createConnection`, `systemClock`                                  | `1d4669d` |
-| Gateway      | Composition: servers, connection, internals | `packages/gateway-core/src/gateway.ts`      | `createGateway`                                                    | `1d4669d` |
+| Stream       | SSE parse, watchdog, backoff, batching, fan-out | `packages/gateway-core/src/events.ts`    | `createEventStream`, `EngineStreamEvent`, `StreamConnectionReporter` | `4323cc7` |
+| Gateway      | Composition: servers, connection, stream, internals | `packages/gateway-core/src/gateway.ts` | `createGateway`                                               | `4323cc7` |
 | Logging      | Secret-free logger with the prohibited rule | `packages/gateway-core/src/logging.ts`      | `createLogger`, `redactFields`                                     | `1d4669d` |
-| Entry        | Public entry; JSDoc'd exports               | `packages/gateway-core/src/index.ts`        | —                                                                  | `1d4669d` |
+| Entry        | Public entry; JSDoc'd exports               | `packages/gateway-core/src/index.ts`        | —                                                                  | `4323cc7` |
 
 ### Planned Artifacts
 
 | Layer     | Responsibility                              | Planned path                                    | Main symbol              | Change type | Task  |
 |-----------|---------------------------------------------|-------------------------------------------------|--------------------------|-------------|-------|
-| Gateway   | SSE parse, watchdog, backoff, batching, fan-out | `packages/gateway-core/src/events.ts`        | `createEventStream`      | Create      | T-005 |
 | Gateway   | `engine.fetch` forwarding with auth          | `packages/gateway-core/src/forward.ts`          | `createForwardHandler`   | Create      | T-006 |
 | Host      | Create the gateway once; wire per-window MessagePort channels | `apps/desktop/src/main/gateway-host.ts` | `createGatewayHost`      | Create      | T-009 |
 | Host      | `Transport` over `MessagePortMain`           | `apps/desktop/src/main/transport.ts`            | `mainTransport`          | Create      | T-009 |
@@ -409,7 +413,8 @@ Everything below was read at `1d4669d`, the T-004 implementation commit.
 ### Channel Envelope
 
 All messages are defined in `@mortise/rpc-contracts` (T-002). Both ends validate every inbound
-message. Every row in this section is labeled **Planned**.
+message. The gateway produces the three event payloads today (T-004 and T-005); the desktop host
+(T-009) emits them over a channel. The request methods are `Planned` until their handlers exist.
 
 ```json
 { "v": 1, "id": "msg_1", "type": "request", "name": "engine.fetch", "payload": {} }
@@ -436,12 +441,15 @@ one of `invalid_message`, `invalid_input`, `invalid_output`, `method_not_found`,
 
 | Event                | Payload                                        | Status  | Emitted when                                     |
 |----------------------|------------------------------------------------|---------|--------------------------------------------------|
-| `connection.changed` | `{ serverId, state }`                          | Planned | Any connection state transition                  |
-| `engine.events`      | `{ serverId, generation, events: unknown[] }`  | Planned | Each batching interval while `live`              |
-| `engine.resync`      | `{ serverId, generation, reason }`             | Planned | Before forwarding any event of a new generation   |
+| `connection.changed` | `{ serverId, state }`                          | Current | Any connection state transition (T-004)          |
+| `engine.events`      | `{ serverId, generation, events: unknown[] }`  | Current | Each batching interval while a generation is live (T-005) |
+| `engine.resync`      | `{ serverId, generation, reason }`             | Current | Before forwarding any event of a new generation (T-005)  |
 
-Raw wire events are `unknown[]`; the adapter validates them. The gateway never interprets payloads
-beyond JSON parsing and reading `type` (§BR-016).
+The payloads above are produced by `gateway.onConnectionChange` and `EventStream.subscribe` today;
+`createServer(...).emit` carries them to a window once T-009 wires the host. `engine.resync.reason` is
+`reconnected` for a network end, `gap` for a stall and `overflow` for a server close. Raw wire events
+are `unknown[]`; the adapter validates them. The gateway never interprets payloads beyond JSON
+parsing and reading `type` (§BR-016).
 
 ### Engine HTTP Used
 
@@ -484,9 +492,9 @@ stored by the gateway (C2, §6.5 of the overview).
 
 ## 14. Business Rules
 
-Rules BR-001..BR-010 and BR-018 are implemented and tested at `1d4669d` (T-004). Every other rule
-below is **Untested**; the task that will add its test is named. Rule IDs are stable and are cited
-by test names.
+Rules BR-001..BR-010 and BR-018 are implemented and tested at `1d4669d` (T-004). BR-011..BR-017 are
+implemented and tested at `4323cc7` (T-005). Every other rule below is **Untested**; the task that
+will add its test is named. Rule IDs are stable and are cited by test names.
 
 | Rule ID | Status  | Rule                                                                                             | Enforcement point        | Test reference                          |
 |---------|---------|--------------------------------------------------------------------------------------------------|--------------------------|-----------------------------------------|
@@ -500,13 +508,13 @@ by test names.
 | BR-008  | Current | A 404 on `GET /api/info` is `incompatible` protocol, not an older version                        | `probe.ts`               | `probe.test.ts` (BR-008) |
 | BR-009  | Current | Capabilities derive from `/api/info` and `/openapi.json` operation ids, cached per version       | `capabilities.ts`        | `capabilities.test.ts` (BR-009) |
 | BR-010  | Current | A replaced registration returns the machine to `discovering` and rechecks the version            | `connection.ts`          | `connection.test.ts` (BR-010, CASE-006) |
-| BR-011  | Planned | Exactly one `/api/event` subscription per connected server, shared by all subscribers            | `events.ts`              | Untested; planned in T-005 (`packages/gateway-core/src/events.test.ts`) |
-| BR-012  | Planned | The first stream event must be `server.connected`; anything else is an error that reconnects     | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
-| BR-013  | Planned | Abort and reconnect after 45 s with no bytes; heartbeat comments reset the deadline              | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
-| BR-014  | Planned | Reconnect uses capped backoff; a new successful connect resets it                                | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
-| BR-015  | Planned | Each successful connect increments `generation`; `engine.resync` precedes any event of that generation | `events.ts`         | Untested; planned in T-005 (`events.test.ts`) |
-| BR-016  | Planned | Forward events in batches on a configurable interval; never interpret payloads beyond JSON parse and `type` | `events.ts`    | Untested; planned in T-005 (`events.test.ts`) |
-| BR-017  | Planned | A malformed event is logged without payload contents and skipped; it never kills the stream       | `events.ts`              | Untested; planned in T-005 (`events.test.ts`) |
+| BR-011  | Current | Exactly one `/api/event` subscription per connected server, shared by all subscribers            | `events.ts`              | `events.test.ts` (BR-011, AC-007) |
+| BR-012  | Current | The first stream event must be `server.connected`; anything else is an error that reconnects     | `events.ts`              | `events.test.ts` (BR-012, CASE-003) |
+| BR-013  | Current | Abort and reconnect after 45 s with no bytes; heartbeat comments reset the deadline              | `events.ts`              | `events.test.ts` (BR-013, CASE-001/002) |
+| BR-014  | Current | Reconnect uses capped backoff; a new successful connect resets it                                | `events.ts`              | `events.test.ts` (BR-014, CASE-014) |
+| BR-015  | Current | Each successful connect increments `generation`; `engine.resync` precedes any event of that generation | `events.ts`         | `events.test.ts` (BR-015, AC-005) |
+| BR-016  | Current | Forward events in batches on a configurable interval; never interpret payloads beyond JSON parse and `type` | `events.ts`    | `events.test.ts` (BR-016, AC-006) |
+| BR-017  | Current | A malformed event is logged without payload contents and skipped; it never kills the stream       | `events.ts`              | `events.test.ts` (BR-017, CASE-005) |
 | BR-018  | Current | The gateway holds no domain state and derives no status; every view is rebuildable from fresh reads | `gateway.ts`           | `gateway.test.ts` (BR-018) |
 | BR-019  | Planned | `engine.fetch` allows only `/api/*` and `/openapi.json`; rejects `..`, absolute URLs and `/auth/*` | `forward.ts`            | Untested; planned in T-006 (`packages/gateway-core/src/forward.test.ts`) |
 | BR-020  | Planned | Reject client-supplied `authorization`, `cookie` and `proxy-authorization` headers, case-insensitive | `forward.ts`         | Untested; planned in T-006 (`forward.test.ts`) |
@@ -519,8 +527,9 @@ by test names.
 
 ## 15. Acceptance Criteria and Cases
 
-AC-001..AC-004 are implemented and tested at `1d4669d` (T-004). Every other criterion is
-**Untested**; the task that will add its test is named.
+AC-001..AC-004 are implemented and tested at `1d4669d` (T-004). AC-005..AC-007 are implemented and
+tested at `4323cc7` (T-005), except the desktop-host half of AC-007 (T-009). Every other criterion
+is **Untested**; the task that will add its test is named.
 
 ### AC-001: Join an existing service — Status: **Current**
 
@@ -562,30 +571,35 @@ Test: `discovery.test.ts` (BR-002, BR-004) and `connection.test.ts` (BR-005, CAS
 
 Test: `connection.test.ts` (BR-010, CASE-007). The forwarding half (`forward.test.ts`) is T-006.
 
-### AC-005: Resync on reconnect — Status: **Planned**
+### AC-005: Resync on reconnect — Status: **Current**
 
 **Given** a live stream
 **When** it stalls for 45 s, overflows, or the connection drops
 **Then** the gateway reconnects, increments `generation`, and emits `engine.resync` before any event of the new generation
 
-Test: Untested; planned in T-005 (`packages/gateway-core/src/events.test.ts`).
+Test: `events.test.ts` (BR-013, BR-015): a 45 s silence reconnects as `stalled` with a `gap` resync; a
+server close reconnects as `overflow` with an `overflow` resync; a dedicated case stalls the stream
+mid-batch and asserts no generation-N event is delivered after the generation-N+1 resync.
 
-### AC-006: Ordered batched delivery — Status: **Planned**
+### AC-006: Ordered batched delivery — Status: **Current**
 
 **Given** a healthy stream
 **When** events arrive
 **Then** they are delivered in order as `engine.events` batches on the configured interval, and malformed events are skipped with a secret-free log
 
-Test: Untested; planned in T-005 (`events.test.ts`).
+Test: `events.test.ts` (BR-016, BR-017): two events arrive in one batch in order; a malformed payload
+is skipped, logged without its contents, and the next valid event still arrives.
 
-### AC-007: One upstream stream for many subscribers — Status: **Planned**
+### AC-007: One upstream stream for many subscribers — Status: **Current** (events half)
 
 **Given** two or more subscribers
 **When** they subscribe to the same server
 **Then** the fixture server sees exactly one upstream `GET /api/event`
 **And** stopping the gateway closes the upstream and clears timers
 
-Test: Untested; planned in T-005 (`events.test.ts`) and T-009 (`gateway-host.test.ts`).
+Test: `events.test.ts` (BR-011, CASE-013): two subscribers receive the same batch while the fixture
+counts one request; the upstream stays open while a subscriber remains, closes with none, and a stop
+clears every timer. The desktop-host half (`gateway-host.test.ts`, two windows) is T-009.
 
 ### AC-008: Authenticated forwarding — Status: **Planned**
 
@@ -691,8 +705,9 @@ The logger takes a prohibited-field rule so SEC-002 is testable with a capturing
 by inspection.
 
 T-004 implements the connection-state-change and start-decision lines, plus `registration replaced`
-and the probe/start failure lines. `logging.ts` redacts prohibited fields at every depth before a
-sink sees them. The stream, resync, malformed-event and forwarding lines arrive with T-005 and T-006.
+and the probe/start failure lines. T-005 adds the stream connected/lost, resync and malformed-event
+lines. `logging.ts` redacts prohibited fields at every depth before a sink sees them. The forwarding
+lines arrive with T-006.
 
 ## 20. Testing Strategy
 
@@ -723,12 +738,12 @@ Only targets that come from a real source are listed. No latency target is inven
 
 | ID      | Requirement                            | Target                                            | Source / validation                                  |
 |---------|----------------------------------------|---------------------------------------------------|------------------------------------------------------|
-| OPS-001 | Idle stream detection                  | Abort after 45 s with no bytes; heartbeats reset   | Upstream `defaultIdleTimeout`; T-005 AC-2 (fake timers) |
-| OPS-002 | Reconnect backoff                      | 1, 2, 5, 10 s, capped; reset on a good connect     | T-005; CASE-014                                       |
-| OPS-003 | Event batching window                  | Default 16 ms, configurable                        | T-005; confirm against upstream 10 ms (Q-004)         |
+| OPS-001 | Idle stream detection                  | Abort after 45 s with no bytes; heartbeats reset   | Upstream `defaultIdleTimeout`; `events.test.ts` (BR-013, CASE-001/002) |
+| OPS-002 | Reconnect backoff                      | 1, 2, 5, 10 s, capped; reset on a good connect     | `events.test.ts` (BR-014, CASE-014)                 |
+| OPS-003 | Event batching window                  | Default 16 ms, configurable                        | `events.test.ts` (BR-016); confirmed per Q-004      |
 | OPS-004 | Channel request timeout                | 30 s default                                       | T-002                                                 |
-| OPS-005 | Connect timeout for the stream         | 2 s                                                | Upstream `connectTimeout`                             |
-| OPS-006 | Upstream streams per connected server  | 1, independent of window count                     | T-005 AC-6, T-009 AC-2                                |
+| OPS-005 | Connect timeout for the stream         | 2 s                                                | Upstream `connectTimeout`; `events.test.ts` (OPS-005) |
+| OPS-006 | Upstream streams per connected server  | 1, independent of window count                     | `events.test.ts` (BR-011); T-009 AC-2               |
 
 Event volume and payload limits are Unknown; the batching window bounds renderer wakeups, and the
 engine bounds the stream at 4,096 queued events per subscriber. Timeouts and retries for forwarded
@@ -741,13 +756,14 @@ values fixed by this document so implementing tasks do not choose them.
 
 | Setting                     | Status  | Default                     | Purpose                                      | Restart? |
 |-----------------------------|---------|-----------------------------|----------------------------------------------|----------|
-| `SUPPORTED_RANGE`           | Planned | `>=2.0.20 <2.1.0`           | Declared engine support range                | No       |
-| `HIGHEST_TESTED_VERSION`    | Planned | `2.0.26`                    | Boundary between `supported` and `untested`  | No       |
-| `STREAM_IDLE_TIMEOUT_MS`    | Planned | `45000`                     | Watchdog for a silent stream                 | No       |
-| `EVENT_BATCH_INTERVAL_MS`   | Planned | `16`                        | Fan-out batching window                      | No       |
-| `RECONNECT_BACKOFF_MS`      | Planned | `[1000, 2000, 5000, 10000]` | Reconnect backoff, capped                    | No       |
-| `CHANNEL_TIMEOUT_MS`        | Planned | `30000`                     | Default channel request timeout (T-002)      | No       |
-| `START_ALLOWED`             | Planned | `true`                      | Whether start policy may spawn the user CLI  | No       |
+| `SUPPORTED_RANGE`           | Current | `>=2.0.20 <2.1.0`           | Declared engine support range                | No       |
+| `HIGHEST_TESTED_VERSION`    | Current | `2.0.26`                    | Boundary between `supported` and `untested`  | No       |
+| `STREAM_IDLE_TIMEOUT_MS`    | Current | `45000`                     | Watchdog for a silent stream                 | No       |
+| `STREAM_CONNECT_TIMEOUT_MS` | Current | `2000`                      | Give up on a stream that never starts        | No       |
+| `EVENT_BATCH_INTERVAL_MS`   | Current | `16`                        | Fan-out batching window                      | No       |
+| `RECONNECT_BACKOFF_MS`      | Current | `[1000, 2000, 5000, 10000]` | Reconnect backoff, capped                    | No       |
+| `CHANNEL_TIMEOUT_MS`        | Current | `30000`                     | Default channel request timeout (T-002)      | No       |
+| `START_ALLOWED`             | Current | `true`                      | Whether start policy may spawn the user CLI  | No       |
 
 ## 23. Dependencies and Impact Analysis
 
@@ -767,7 +783,7 @@ task and a separate file (`gateway-host.ts`).
 
 ## 24. Implementation Plan
 
-Phases 2–4 describe future work. Phase 1 is implemented at `1d4669d`.
+Phases 3–4 describe future work. Phases 1 and 2 are implemented at `1d4669d` and `4323cc7`.
 
 ### Phase 1: Discovery and the connection state machine (T-004) — Status: **Current**
 
@@ -779,21 +795,21 @@ Phases 2–4 describe future work. Phase 1 is implemented at `1d4669d`.
 
 **Validation:** Unit tests cover every transition with injected fakes; `ensure()` is never called with a version and never when a registration exists; no public value or log line contains the password. `bun run check` passes at `1d4669d`.
 
-**Completion criteria:** AC-001..AC-004 pass; `bun run check:deps` holds. AC-007's host-independent part (one gateway per server) is deferred to T-005/T-009 because it needs the stream.
+**Completion criteria:** AC-001..AC-004 pass; `bun run check:deps` holds. AC-007's host-independent part (one gateway per server) is deferred to T-005/T-009 because it needs the stream; T-005 delivered the events half (BR-011), T-009 owns the two-window host half.
 
 **Recovery:** No persistent state; a bad build is a code rollback.
 
-### Phase 2: Event stream, batching and resync (T-005)
+### Phase 2: Event stream, batching and resync (T-005) — Status: **Current**
 
 **Objective:** One authenticated stream per server, with watchdog, backoff, generation, batching and resync. Covers P2 and P3.
 
-**Expected changes:** `events.ts`.
+**Actual changes:** `packages/gateway-core/src/events.ts` (new: `createEventStream`); `gateway.ts` creates the stream, starts it from `onServiceReady`, stops it on a terminal connection state and exposes it as `internal.events`; `index.ts` exports the new symbols.
 
-**Behavior introduced:** BR-011..BR-017.
+**Behavior introduced:** BR-011..BR-017 and OPS-001, OPS-002, OPS-003, OPS-005, OPS-006. The 401 path calls `connection.onUnauthorized` (§16).
 
-**Validation:** Tests against a local Node `http` SSE fixture: order and batching, heartbeat survival past 45 s with fake timers, stall and overflow reconnect with resync, one upstream for two subscribers, clean shutdown.
+**Validation:** `events.test.ts` drives a local Node `http` SSE fixture with an injected clock: ordered batching, malformed skip, first-event rejection, heartbeat survival past 45 s, stall and server-close reconnect with resync, the buffered-batch-before-resync ordering pin, backoff 1/2/5/10 s capped, connect timeout, two subscribers on one upstream, the last subscriber closing it, and a clean stop with no pending timers. `gateway.test.ts` proves a stream 401 reaches `unauthorized`.
 
-**Completion criteria:** AC-005..AC-007 pass; no open handles after stop.
+**Completion criteria:** AC-005..AC-007 pass; `bun run check` passes at `4323cc7`; no open handles after stop. AC-007's desktop-host half remains for T-009.
 
 ### Phase 3: Authenticated request forwarding (T-006)
 
@@ -918,6 +934,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | 2026-10-10 | 0.1.0   | Initial pre-implementation design | Planned | deepseek-v4.1-flash |
 | 2026-10-10 | 0.1.1   | Mode D sync for T-004: discovery, probe, capabilities, connection machine and gateway are `Current` at `1d4669d`; corrected the stale §11 domain and contracts rows | Current | deepseek-v4.1-flash |
 | 2026-10-10 | 0.1.2   | Cover the probe-failure path: `connection.test.ts` now asserts an unreachable probe and a non-2xx probe both reach `failed`, and that retry recovers (§16) | Current | deepseek-v4.1-flash |
+| 2026-10-11 | 0.1.3   | Mode D sync for T-005: the event stream (`events.ts`) is `Current` at `4323cc7`; BR-011..BR-017, AC-005..AC-007 and OPS-001/002/003/005/006 move to `Current`; corrected stale §12 event and §22 configuration statuses | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 

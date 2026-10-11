@@ -29,6 +29,17 @@ export {
   type ServiceOptions,
 } from "./discovery.js"
 export {
+  createEventStream,
+  type EngineStreamEvent,
+  EVENT_BATCH_INTERVAL_MS,
+  type EventStream,
+  type EventStreamDeps,
+  RECONNECT_BACKOFF_MS,
+  STREAM_CONNECT_TIMEOUT_MS,
+  STREAM_IDLE_TIMEOUT_MS,
+  type StreamConnectionReporter,
+} from "./events.js"
+export {
   type ConnectionChange,
   createGateway,
   type Gateway,

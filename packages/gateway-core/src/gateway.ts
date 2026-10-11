@@ -7,6 +7,7 @@ import type { ConnectionState, EngineInfo, ServerId, ServerRef } from "@mortise/
 import { type CapabilityCache, createCapabilityCache } from "./capabilities.js"
 import { type Clock, type Connection, createConnection, systemClock } from "./connection.js"
 import type { Discovery, ServiceEndpoint } from "./discovery.js"
+import { createEventStream, type EventStream } from "./events.js"
 import type { Logger } from "./logging.js"
 import { probeInfo } from "./probe.js"
 
@@ -24,6 +25,8 @@ export interface ConnectionChange {
 export interface GatewayInternal {
   /** The raw connection machine, so the stream can report connect, loss and re-auth. */
   readonly connection: Connection
+  /** The per-server event stream, so the host can fan its batches out to every window (T-009). */
+  readonly events: EventStream
   /** The adopted endpoint, or `undefined` before a service is found. Carries the password. */
   endpoint(): ServiceEndpoint | undefined
   /** The adopted engine's version and capabilities, or `undefined`. */
@@ -73,7 +76,21 @@ export function createGateway(options: GatewayOptions): Gateway {
   let url = ""
 
   const capabilities: CapabilityCache = createCapabilityCache({ fetch: options.fetch })
-  const connection = createConnection({
+  // The connection machine and the event stream report to each other; the stream is built first so
+  // `onServiceReady` can start it, and the delegate resolves once the machine exists.
+  let connection: Connection
+  const events: EventStream = createEventStream({
+    serverId: options.serverId,
+    fetch: options.fetch,
+    logger: options.logger,
+    clock,
+    connection: {
+      onStreamConnected: () => connection.onStreamConnected(),
+      onStreamLost: (reason) => connection.onStreamLost(reason),
+      onUnauthorized: () => connection.onUnauthorized(),
+    },
+  })
+  connection = createConnection({
     serverId: options.serverId,
     discovery: options.discovery,
     probe: (target) => probeInfo({ fetch: options.fetch }, target),
@@ -85,7 +102,12 @@ export function createGateway(options: GatewayOptions): Gateway {
       endpoint = ready
       engineInfo = info
       url = ready.url
+      events.start(ready)
     },
+  })
+  // The stream only runs while a service is adopted; a terminal state closes it.
+  connection.subscribe((state) => {
+    if (state.phase !== "connecting" && state.phase !== "live" && state.phase !== "resyncing") events.stop()
   })
 
   function requireServer(serverId: ServerId): void {
@@ -108,9 +130,13 @@ export function createGateway(options: GatewayOptions): Gateway {
       requireServer(serverId)
       await connection.recheck()
     },
-    dispose: () => connection.dispose(),
+    dispose: () => {
+      events.dispose()
+      connection.dispose()
+    },
     internal: {
       connection,
+      events,
       endpoint: () => endpoint,
       info: () => engineInfo,
     },
