@@ -10,9 +10,9 @@ owner: Mortise maintainers
 created: 2026-10-10
 last_updated: 2026-10-11
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 4323cc7
+last_verified_commit: 508aaff
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.3
+version: 0.1.4
 tags:
   - gateway
   - engine
@@ -32,7 +32,7 @@ related_features: []
 | Field                 | Details                                                                                             |
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                             |
-| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine) and the T-005 event stream implemented |
+| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine), the T-005 event stream and the T-006 forwarding handler implemented; the desktop host (T-009) remains |
 | Owner                 | Mortise maintainers                                                                                  |
 | Primary actors        | User, renderer window, gateway (main process), OpenCode service, other clients (official app, TUI)   |
 | Trigger               | Application start; a window opening; a connection state change; a renderer request or subscription   |
@@ -41,7 +41,7 @@ related_features: []
 | Data stores           | Engine server list in client SQLite; engine password in main memory now, OS keychain later           |
 | External systems      | OpenCode v2 engine (`opencode serve --service`), registration file via `@opencode/client/service`    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`. Forwarding (T-006) and the desktop host (T-009) have no code yet |
+| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`; T-006 forwarding read at `508aaff`. The desktop host (T-009) has no code yet |
 
 ### At a Glance
 
@@ -55,8 +55,9 @@ gateway adds Basic auth and forwards them, so the password never leaves the main
 **Sections 1–23 and 30 describe planned behaviour. Section 24 is the phased implementation plan and
 maps to tasks T-004, T-005, T-006 and T-009. Phase 1 (T-004: discovery, probe, capabilities and the
 connection state machine) is implemented at `1d4669d`; Phase 2 (T-005: the event stream, batching and
-resync) is implemented at `4323cc7`. The rows they own are labeled `Current`. Forwarding (T-006) and
-the desktop host (T-009) have no code yet, so nothing else is `Current`.**
+resync) is implemented at `4323cc7`; Phase 3 (T-006: the forwarding handler) is implemented at
+`508aaff`. The rows they own are labeled `Current`. The desktop host (T-009) has no code yet, so
+nothing it owns is `Current`.**
 
 ### Status Legend
 
@@ -64,7 +65,8 @@ Every `Status` value in this document is one of these four. They describe how mu
 has earned, independent of the document and implementation statuses above.
 
 - **Current**: implemented, and read in the code at `last_verified_commit`. Used for the T-004 rows
-  (read at `1d4669d`) and the T-005 event stream (read at `4323cc7`).
+  (read at `1d4669d`), the T-005 event stream (read at `4323cc7`) and the T-006 forwarding handler
+  (read at `508aaff`).
 - **Planned**: proposed or approved, but not implemented.
 - **Inferred**: consistent with the evidence, but not directly verified against Mortise code.
 - **Unknown**: unresolved. Tracked in §28.
@@ -233,8 +235,8 @@ flowchart TD
 | Start policy            | Current | `discovery.ts` + `connection.ts` | Start only if allowed and CLI installed     | `no-engine`; no spawn                                 |
 | Support computation     | Current | `probe.ts` + `capabilities.ts` | Range check and capability set                | `incompatible` or `untested`; never a silent downgrade |
 | Stream admission        | Current | `events.ts`                  | First event must be `server.connected`          | Reconnect and log an error                            |
-| Forwarding authorization| Planned | `forward.ts`                 | Path allowlist and header rules                 | `forbidden_path`                                      |
-| Auth injection          | Planned | `forward.ts`                 | Add Basic auth, strip `set-cookie`              | Map to `engine_unreachable` or `timeout`              |
+| Forwarding authorization| Current | `forward.ts`                 | Path allowlist and header rules                 | `forbidden_path`                                      |
+| Auth injection          | Current | `forward.ts`                 | Add Basic auth, strip `set-cookie`              | Map to `engine_unreachable` or `timeout`              |
 
 ## 9. Data Flow
 
@@ -306,7 +308,7 @@ sequenceDiagram
 | Discovery | Current | Registration file              | Read through `client/service`; classify state and version  | Endpoint plus service descriptor |
 | Probe     | Current | `GET /api/info`, `/openapi.json` | Range compare, capability derivation, cache per version  | `EngineInfo` with support state |
 | Stream    | Current | SSE frames                    | Frame parse, JSON parse for `type`, batch by interval      | `engine.events` batches         |
-| Forward   | Planned | `engine.fetch` message         | Validate, inject Basic auth, classify body, strip headers  | Forwarded response or channel error |
+| Forward   | Current | `engine.fetch` message         | Validate, inject Basic auth, classify body, strip headers  | Forwarded response or channel error |
 
 ### Sensitive Data
 
@@ -372,7 +374,7 @@ last window closing closes it without a state change (CASE-013).
 ### Existing Artifacts
 
 Rows were read at the commit in the `Verified` column: the T-004 rows at `1d4669d`, the T-005 rows
-at `4323cc7`.
+at `4323cc7`, the T-006 rows at `508aaff`.
 
 | Layer        | Responsibility                              | Repository path                             | Main symbol                                                        | Verified  |
 |--------------|---------------------------------------------|---------------------------------------------|--------------------------------------------------------------------|-----------|
@@ -383,15 +385,15 @@ at `4323cc7`.
 | Capabilities | Capability derivation, cached per version   | `packages/gateway-core/src/capabilities.ts` | `deriveCapabilities`, `createCapabilityCache`                      | `1d4669d` |
 | Connection   | Connection state machine                    | `packages/gateway-core/src/connection.ts`   | `createConnection`, `systemClock`                                  | `1d4669d` |
 | Stream       | SSE parse, watchdog, backoff, batching, fan-out | `packages/gateway-core/src/events.ts`    | `createEventStream`, `EngineStreamEvent`, `StreamConnectionReporter` | `4323cc7` |
+| Forward      | `engine.fetch` forwarding with auth and error mapping | `packages/gateway-core/src/forward.ts` | `createForwardHandler`, `ForwardDeps`                  | `508aaff` |
 | Gateway      | Composition: servers, connection, stream, internals | `packages/gateway-core/src/gateway.ts` | `createGateway`                                               | `4323cc7` |
 | Logging      | Secret-free logger with the prohibited rule | `packages/gateway-core/src/logging.ts`      | `createLogger`, `redactFields`                                     | `1d4669d` |
-| Entry        | Public entry; JSDoc'd exports               | `packages/gateway-core/src/index.ts`        | —                                                                  | `4323cc7` |
+| Entry        | Public entry; JSDoc'd exports               | `packages/gateway-core/src/index.ts`        | —                                                                  | `508aaff` |
 
 ### Planned Artifacts
 
 | Layer     | Responsibility                              | Planned path                                    | Main symbol              | Change type | Task  |
 |-----------|---------------------------------------------|-------------------------------------------------|--------------------------|-------------|-------|
-| Gateway   | `engine.fetch` forwarding with auth          | `packages/gateway-core/src/forward.ts`          | `createForwardHandler`   | Create      | T-006 |
 | Host      | Create the gateway once; wire per-window MessagePort channels | `apps/desktop/src/main/gateway-host.ts` | `createGatewayHost`      | Create      | T-009 |
 | Host      | `Transport` over `MessagePortMain`           | `apps/desktop/src/main/transport.ts`            | `mainTransport`          | Create      | T-009 |
 | Renderer  | `Transport` over the DOM `MessagePort`       | `apps/desktop/src/renderer/transport.ts`        | `rendererTransport`      | Create      | T-009 |
@@ -414,7 +416,9 @@ at `4323cc7`.
 
 All messages are defined in `@mortise/rpc-contracts` (T-002). Both ends validate every inbound
 message. The gateway produces the three event payloads today (T-004 and T-005); the desktop host
-(T-009) emits them over a channel. The request methods are `Planned` until their handlers exist.
+(T-009) emits them over a channel. The `engine.fetch` handler exists (T-006, §BR-019..BR-026); the
+`servers.list` and `connection.get` handlers exist only as gateway methods and are registered by
+T-009.
 
 ```json
 { "v": 1, "id": "msg_1", "type": "request", "name": "engine.fetch", "payload": {} }
@@ -430,7 +434,7 @@ one of `invalid_message`, `invalid_input`, `invalid_output`, `method_not_found`,
 |------------------|-----------------------------------------------------------------------|-----------------------|---------|
 | `servers.list`   | none                                                                  | `ServerRef[]`         | Planned |
 | `connection.get` | `{ serverId }`                                                        | `ConnectionState`     | Planned |
-| `engine.fetch`   | `{ serverId, method, path, query?, headers?, body }`                  | `{ status, headers, body }` | Planned |
+| `engine.fetch`   | `{ serverId, method, path, query?, headers?, body }`                  | `{ status, headers, body }` | Current |
 
 `engine.fetch` constraints (from T-002): `method` is one of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`;
 `path` starts with `/api/` or equals `/openapi.json` and contains no `..`; `headers` must not contain
@@ -493,8 +497,8 @@ stored by the gateway (C2, §6.5 of the overview).
 ## 14. Business Rules
 
 Rules BR-001..BR-010 and BR-018 are implemented and tested at `1d4669d` (T-004). BR-011..BR-017 are
-implemented and tested at `4323cc7` (T-005). Every other rule below is **Untested**; the task that
-will add its test is named. Rule IDs are stable and are cited by test names.
+implemented and tested at `4323cc7` (T-005). BR-019..BR-026 are implemented and tested at `508aaff`
+(T-006). Every rule below is `Current`. Rule IDs are stable and are cited by test names.
 
 | Rule ID | Status  | Rule                                                                                             | Enforcement point        | Test reference                          |
 |---------|---------|--------------------------------------------------------------------------------------------------|--------------------------|-----------------------------------------|
@@ -516,20 +520,21 @@ will add its test is named. Rule IDs are stable and are cited by test names.
 | BR-016  | Current | Forward events in batches on a configurable interval; never interpret payloads beyond JSON parse and `type` | `events.ts`    | `events.test.ts` (BR-016, AC-006) |
 | BR-017  | Current | A malformed event is logged without payload contents and skipped; it never kills the stream       | `events.ts`              | `events.test.ts` (BR-017, CASE-005) |
 | BR-018  | Current | The gateway holds no domain state and derives no status; every view is rebuildable from fresh reads | `gateway.ts`           | `gateway.test.ts` (BR-018) |
-| BR-019  | Planned | `engine.fetch` allows only `/api/*` and `/openapi.json`; rejects `..`, absolute URLs and `/auth/*` | `forward.ts`            | Untested; planned in T-006 (`packages/gateway-core/src/forward.test.ts`) |
-| BR-020  | Planned | Reject client-supplied `authorization`, `cookie` and `proxy-authorization` headers, case-insensitive | `forward.ts`         | Untested; planned in T-006 (`forward.test.ts`) |
-| BR-021  | Planned | Inject `Authorization: Basic` with username `opencode` and the current password                   | `forward.ts`            | Untested; planned in T-006 (`forward.test.ts`) |
-| BR-022  | Planned | Response bodies are text for `text/*` and `application/json`, base64 otherwise                    | `forward.ts`            | Untested; planned in T-006 (`forward.test.ts`) |
-| BR-023  | Planned | Strip `set-cookie` from forwarded responses                                                       | `forward.ts`            | Untested; planned in T-006 (`forward.test.ts`) |
-| BR-024  | Planned | Forwarding failures map to `engine_unreachable`, `timeout` and `forbidden_path`                   | `forward.ts`            | Untested; planned in T-006 (`forward.test.ts`) |
-| BR-025  | Planned | A `401` on a forwarded request notifies the connection machine to re-read credentials             | `forward.ts` + `connection.ts` | Untested; planned in T-006 (`forward.test.ts`) |
-| BR-026  | Planned | Non-idempotent requests are never retried automatically                                           | `forward.ts`            | Untested; planned in T-006 (`forward.test.ts`) |
+| BR-019  | Current | `engine.fetch` allows only `/api/*` and `/openapi.json`; rejects `..`, absolute URLs and `/auth/*` | `forward.ts`            | `forward.test.ts` (BR-019, AC-009, CASE-011) |
+| BR-020  | Current | Reject client-supplied `authorization`, `cookie` and `proxy-authorization` headers, case-insensitive | `forward.ts`         | `forward.test.ts` (BR-020, AC-009) |
+| BR-021  | Current | Inject `Authorization: Basic` with username `opencode` and the current password                   | `forward.ts`            | `forward.test.ts` (BR-021, AC-008) |
+| BR-022  | Current | Response bodies are text for `text/*` and `application/json`, base64 otherwise                    | `forward.ts`            | `forward.test.ts` (BR-022, CASE-012) |
+| BR-023  | Current | Strip `set-cookie` from forwarded responses                                                       | `forward.ts`            | `forward.test.ts` (BR-023, SEC-004) |
+| BR-024  | Current | Forwarding failures map to `engine_unreachable`, `timeout` and `forbidden_path`                   | `forward.ts`            | `forward.test.ts` (BR-024) |
+| BR-025  | Current | A `401` on a forwarded request notifies the connection machine to re-read credentials             | `forward.ts` + `connection.ts` | `forward.test.ts` (BR-025), `connection.test.ts` (BR-010) |
+| BR-026  | Current | Non-idempotent requests are never retried automatically                                           | `forward.ts`            | `forward.test.ts` (BR-026) |
 
 ## 15. Acceptance Criteria and Cases
 
 AC-001..AC-004 are implemented and tested at `1d4669d` (T-004). AC-005..AC-007 are implemented and
-tested at `4323cc7` (T-005), except the desktop-host half of AC-007 (T-009). Every other criterion
-is **Untested**; the task that will add its test is named.
+tested at `4323cc7` (T-005), except the desktop-host half of AC-007 (T-009). AC-008..AC-009 are
+implemented and tested at `508aaff` (T-006). Every other criterion is **Untested**; the task that
+will add its test is named.
 
 ### AC-001: Join an existing service — Status: **Current**
 
@@ -569,7 +574,9 @@ Test: `discovery.test.ts` (BR-002, BR-004) and `connection.test.ts` (BR-005, CAS
 **When** the password has rotated and the registration was rewritten
 **Then** the state moves to `unauthorized`, the registration is re-read, and the state recovers
 
-Test: `connection.test.ts` (BR-010, CASE-007). The forwarding half (`forward.test.ts`) is T-006.
+Test: `connection.test.ts` (BR-010, CASE-007) for the recovery path; `forward.test.ts` (BR-025) for
+the forwarding half: a `401` response is returned to the caller and the connection machine's
+`onUnauthorized` runs.
 
 ### AC-005: Resync on reconnect — Status: **Current**
 
@@ -601,21 +608,27 @@ Test: `events.test.ts` (BR-011, CASE-013): two subscribers receive the same batc
 counts one request; the upstream stays open while a subscriber remains, closes with none, and a stop
 clears every timer. The desktop-host half (`gateway-host.test.ts`, two windows) is T-009.
 
-### AC-008: Authenticated forwarding — Status: **Planned**
+### AC-008: Authenticated forwarding — Status: **Current**
 
 **Given** an `engine.fetch` request with an allowed path
 **When** the gateway forwards it
 **Then** the request carries correct Basic auth, the response round-trips, binary bodies arrive as base64, and `set-cookie` is absent
 
-Test: Untested; planned in T-006 (`packages/gateway-core/src/forward.test.ts`).
+Test: `forward.test.ts` (BR-019, BR-021, BR-022, BR-023): a local Node `http` server records the
+`Authorization: Basic` header for username `opencode`; an `application/json` and a `text/plain`
+response round-trip as text; an `application/octet-stream` response arrives as base64 that decodes to
+the original bytes; a response with two `set-cookie` headers exposes neither.
 
-### AC-009: Forwarding boundaries — Status: **Planned**
+### AC-009: Forwarding boundaries — Status: **Current**
 
 **Given** an `engine.fetch` request
 **When** the path is outside the allowlist or a forbidden header is supplied
 **Then** the request is rejected with `forbidden_path` (or the input is rejected) and never forwarded
 
-Test: Untested; planned in T-006 (`forward.test.ts`).
+Test: `forward.test.ts` (BR-019, BR-020, BR-024): `..`, a percent-encoded traversal, an absolute URL,
+`/auth/connect/abc` and the three forbidden headers are each rejected with `forbidden_path`, and the
+fixture server sees zero requests. The channel's `engine.fetch` input schema rejects the same inputs
+with `invalid_input` before the handler is reached (`methods.test.ts`, T-002).
 
 ### AC-010: Desktop host and two windows — Status: **Planned**
 
@@ -675,9 +688,9 @@ never emitted (§17).
 | ID      | Requirement                                                                 | Enforcement                                  | Validation                                          |
 |---------|------------------------------------------------------------------------------|----------------------------------------------|-----------------------------------------------------|
 | SEC-001 | The engine password and pairing tokens never cross the channel               | Gateway holds them; channel schemas cannot carry them | Current: `gateway.test.ts` (AC-5) asserts every public value is password-free while `internal.endpoint()` still carries it |
-| SEC-002 | No password, auth header, pairing token or body content appears in logs      | Secret-free logger with a prohibited-field rule | Current: `connection.test.ts` (SEC-002) with a capturing logger; the forwarding half is T-006 |
-| SEC-003 | The gateway re-validates the path allowlist and header rules                 | `forward.ts`, defense in depth               | Untested; planned in T-006 (`forward.test.ts`)      |
-| SEC-004 | `set-cookie` is stripped from forwarded responses                            | `forward.ts`                                 | Untested; planned in T-006 (`forward.test.ts`)      |
+| SEC-002 | No password, auth header, pairing token or body content appears in logs      | Secret-free logger with a prohibited-field rule | Current: `connection.test.ts` (SEC-002) and `forward.test.ts` (SEC-002, AC-7) with a capturing logger |
+| SEC-003 | The gateway re-validates the path allowlist and header rules                 | `forward.ts`, defense in depth               | Current: `forward.test.ts` (SEC-003, BR-019, BR-020) |
+| SEC-004 | `set-cookie` is stripped from forwarded responses                            | `forward.ts`                                 | Current: `forward.test.ts` (SEC-004, BR-023)        |
 | SEC-005 | Renderer and preload bundles contain no credential handling                  | Bundle assertion                             | Untested; planned in T-009 (`rg` over `apps/desktop/out/`) |
 | SEC-006 | The gateway never touches the engine database, data directory or CLI-private files | Only `@opencode/client/service` reads the registration file | Current: `bun run check:deps` passes; the registration is read only through `@opencode/client/service` in `discovery.ts` |
 
@@ -706,8 +719,9 @@ by inspection.
 
 T-004 implements the connection-state-change and start-decision lines, plus `registration replaced`
 and the probe/start failure lines. T-005 adds the stream connected/lost, resync and malformed-event
-lines. `logging.ts` redacts prohibited fields at every depth before a sink sees them. The forwarding
-lines arrive with T-006.
+lines. T-006 adds the forwarding path/header rejection, unreachable, timeout and `401` lines; none
+carries a credential or a body. `logging.ts` redacts prohibited fields at every depth before a sink
+sees them.
 
 ## 20. Testing Strategy
 
@@ -721,7 +735,8 @@ named `*.integration.test.ts` and are wrapped in `describe.skipIf(!process.env.M
 | Unit        | Desktop host and both transports                      | `apps/desktop/src/main/*.test.ts`, `apps/desktop/src/renderer/*.test.ts` |
 | Integration | Coexistence and resync against an isolated engine     | `packages/gateway-core/src/*.integration.test.ts` (T-013) |
 
-SSE fixtures use a local Node `http` server, so the stream tests need no engine.
+SSE and forwarding fixtures use a local Node `http` server, so the stream and forwarding tests need
+no engine.
 
 ### Validation Commands
 
@@ -763,6 +778,7 @@ values fixed by this document so implementing tasks do not choose them.
 | `EVENT_BATCH_INTERVAL_MS`   | Current | `16`                        | Fan-out batching window                      | No       |
 | `RECONNECT_BACKOFF_MS`      | Current | `[1000, 2000, 5000, 10000]` | Reconnect backoff, capped                    | No       |
 | `CHANNEL_TIMEOUT_MS`        | Current | `30000`                     | Default channel request timeout (T-002)      | No       |
+| `FORWARD_TIMEOUT_MS`        | Current | `30000`                     | Give up on a forwarded request and map to `timeout` (T-006) | No |
 | `START_ALLOWED`             | Current | `true`                      | Whether start policy may spawn the user CLI  | No       |
 
 ## 23. Dependencies and Impact Analysis
@@ -783,7 +799,8 @@ task and a separate file (`gateway-host.ts`).
 
 ## 24. Implementation Plan
 
-Phases 3–4 describe future work. Phases 1 and 2 are implemented at `1d4669d` and `4323cc7`.
+Phases 4 describes future work. Phases 1, 2 and 3 are implemented at `1d4669d`, `4323cc7` and
+`508aaff`.
 
 ### Phase 1: Discovery and the connection state machine (T-004) — Status: **Current**
 
@@ -811,17 +828,30 @@ Phases 3–4 describe future work. Phases 1 and 2 are implemented at `1d4669d` a
 
 **Completion criteria:** AC-005..AC-007 pass; `bun run check` passes at `4323cc7`; no open handles after stop. AC-007's desktop-host half remains for T-009.
 
-### Phase 3: Authenticated request forwarding (T-006)
+### Phase 3: Authenticated request forwarding (T-006) — Status: **Current**
 
 **Objective:** Answer `engine.fetch` by forwarding with Basic auth and mapping errors. Covers P3.
 
-**Expected changes:** `forward.ts` and its channel handler.
+**Actual changes:** `packages/gateway-core/src/forward.ts` (new: `createForwardHandler`,
+`ForwardDeps`, `FORWARD_TIMEOUT_MS`); `index.ts` exports them. The handler is what T-009 registers on
+the channel server; the gateway's `internal.endpoint()` and `internal.connection` are its inputs.
 
-**Behavior introduced:** BR-019..BR-026.
+**Behavior introduced:** BR-019..BR-026 and SEC-003, SEC-004; a gateway-side `FORWARD_TIMEOUT_MS`
+(§22). The handler re-validates the path and headers before any network call, injects Basic auth from
+the adopted endpoint, classifies the body as text or base64, strips `set-cookie`, calls
+`connection.onUnauthorized` on a `401`, and forwards at most once.
 
-**Validation:** Tests against a local Node `http` server: auth round-trip, header rejection, path rejection, base64 bodies, `set-cookie` stripping, `401` re-auth, secret-free logs.
+**Validation:** `forward.test.ts` drives a local Node `http` server: the `Authorization: Basic` header
+for username `opencode`, a JSON/text round-trip with query parameters, base64 binary round-trip,
+`set-cookie` stripping, `forbidden_path` for `..`, an encoded traversal, an absolute URL, `/auth/*`
+and the three forbidden headers with zero upstream requests, `engine_unreachable` and `timeout`
+mapping, a `401` that reaches `onUnauthorized`, a single forward for a non-idempotent POST, and a
+capturing logger that never sees a password, auth header or body content.
 
-**Completion criteria:** AC-008..AC-009 pass; a capturing logger proves no secret is logged.
+**Completion criteria:** AC-008..AC-009 pass; `bun run check` passes at `508aaff`; a capturing logger
+proves no secret is logged.
+
+**Recovery:** No persistent state; a bad build is a code rollback.
 
 ### Phase 4: Desktop host and MessagePort channel (T-009)
 
@@ -935,6 +965,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | 2026-10-10 | 0.1.1   | Mode D sync for T-004: discovery, probe, capabilities, connection machine and gateway are `Current` at `1d4669d`; corrected the stale §11 domain and contracts rows | Current | deepseek-v4.1-flash |
 | 2026-10-10 | 0.1.2   | Cover the probe-failure path: `connection.test.ts` now asserts an unreachable probe and a non-2xx probe both reach `failed`, and that retry recovers (§16) | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.3   | Mode D sync for T-005: the event stream (`events.ts`) is `Current` at `4323cc7`; BR-011..BR-017, AC-005..AC-007 and OPS-001/002/003/005/006 move to `Current`; corrected stale §12 event and §22 configuration statuses | Current | deepseek-v4.1-flash |
+| 2026-10-11 | 0.1.4   | Mode D sync for T-006: `forward.ts` is `Current` at `508aaff`; BR-019..BR-026, AC-008, AC-009, SEC-003 and SEC-004 move to `Current`; added the `FORWARD_TIMEOUT_MS` constant to §22 | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 
