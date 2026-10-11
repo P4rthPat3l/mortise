@@ -10,9 +10,9 @@ owner: Mortise maintainers
 created: 2026-10-10
 last_updated: 2026-10-11
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 508aaff
+last_verified_commit: cf291d5
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.4
+version: 0.1.5
 tags:
   - gateway
   - engine
@@ -426,7 +426,10 @@ T-009.
 
 `type` is `request`, `response` or `event`. Errors carry `{ "code": "...", "message": "..." }` with
 one of `invalid_message`, `invalid_input`, `invalid_output`, `method_not_found`, `timeout`,
-`aborted`, `internal`, plus the forwarding codes in §16.
+`aborted`, `internal`, plus the forwarding codes in §16. A handler that throws a `ChannelError` keeps
+its code and message through `createServer`; the forwarding boundary relies on this for
+`forbidden_path`, `engine_unreachable` and `timeout`. Any other handler error is answered with
+`internal`.
 
 ### Requests (UI → Gateway)
 
@@ -966,6 +969,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | 2026-10-10 | 0.1.2   | Cover the probe-failure path: `connection.test.ts` now asserts an unreachable probe and a non-2xx probe both reach `failed`, and that retry recovers (§16) | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.3   | Mode D sync for T-005: the event stream (`events.ts`) is `Current` at `4323cc7`; BR-011..BR-017, AC-005..AC-007 and OPS-001/002/003/005/006 move to `Current`; corrected stale §12 event and §22 configuration statuses | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.4   | Mode D sync for T-006: `forward.ts` is `Current` at `508aaff`; BR-019..BR-026, AC-008, AC-009, SEC-003 and SEC-004 move to `Current`; added the `FORWARD_TIMEOUT_MS` constant to §22 | Current | deepseek-v4.1-flash |
+| 2026-10-11 | 0.1.5   | Relay a handler-thrown `ChannelError` code through `createServer` (`channel.ts` at `cf291d5`) so the forwarding boundary's `forbidden_path`, `engine_unreachable` and `timeout` reach the caller instead of collapsing to `internal` | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 
