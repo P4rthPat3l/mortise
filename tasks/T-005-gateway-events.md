@@ -2,7 +2,7 @@
 id: T-005
 title: "Gateway: event stream, batching and resync"
 phase: 0
-status: todo
+status: ready
 tier: sonnet
 depends_on: [T-004]
 covers: [P2, P3]
