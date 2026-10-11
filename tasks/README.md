@@ -30,10 +30,10 @@ Goal: prove the decisions that are hardest to reverse (P1 to P8 in `docs/archite
 | [T-003](T-003-gateway-feature-doc.md) | FEAT-001 engine gateway feature document | sonnet | none | P1, P2, P3 | done |
 | [T-004](T-004-gateway-discovery.md) | Gateway: discovery and connection state machine | sonnet | T-001, T-002, T-003 | P1 | done |
 | [T-005](T-005-gateway-events.md) | Gateway: event stream, batching and resync | sonnet | T-004 | P2, P3 | done |
-| [T-006](T-006-gateway-forwarding.md) | Gateway: authenticated request forwarding | sonnet | T-002, T-004 | P3 | ready |
+| [T-006](T-006-gateway-forwarding.md) | Gateway: authenticated request forwarding | sonnet | T-002, T-004 | P3 | done |
 | [T-007](T-007-engine-sandbox.md) | Engine sandbox script and contract fixtures | sonnet | none | P2, P7 | done |
 | [T-008](T-008-engine-adapter.md) | Engine adapter v0 | sonnet | T-001, T-007 | P4 | done |
-| [T-009](T-009-desktop-gateway-host.md) | Desktop gateway host and MessagePort channel | sonnet | T-002, T-004, T-005, T-006 | P3 | todo |
+| [T-009](T-009-desktop-gateway-host.md) | Desktop gateway host and MessagePort channel | sonnet | T-002, T-004, T-005, T-006 | P3 | ready |
 | [T-010](T-010-core-services.md) | Core: registries, commands, keybindings, settings, store | sonnet | T-001 | P5 | done |
 | [T-011](T-011-module-sdk.md) | Module SDK and FEAT-002 | sonnet | T-010 | P5 | done |
 | [T-012](T-012-workbench-timeline.md) | Workbench composition root and streaming timeline | sonnet | T-008, T-009, T-011 | P3, P4, P8 | todo |

@@ -2,7 +2,7 @@
 id: T-006
 title: "Gateway: authenticated request forwarding"
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-002, T-004]
 covers: [P3]
