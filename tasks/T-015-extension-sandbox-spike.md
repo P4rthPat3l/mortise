@@ -2,12 +2,12 @@
 id: T-015
 title: Sandboxed extension spike
 phase: 0
-status: ready
+status: in-progress
 tier: opus
 depends_on: [T-009]
 covers: [P6]
-assignee: null
-started: null
+assignee: opencode
+started: 2026-10-22
 ---
 
 # T-015 Sandboxed extension spike

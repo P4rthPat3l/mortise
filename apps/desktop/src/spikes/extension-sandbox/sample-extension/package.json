@@ -1,0 +1,46 @@
+{
+  "name": "@mortise-spike/sample-extension",
+  "version": "0.0.0",
+  "private": true,
+  "description": "T-015 spike fixture. Not a published extension.",
+  "mortise": {
+    "apiVersion": 1,
+    "id": "acme.tasks",
+    "tier": "sandboxed",
+    "engines": {
+      "app": ">=0.0.0"
+    },
+    "activation": [
+      "onView:acme.tasks"
+    ],
+    "capabilities": [],
+    "contributes": {
+      "commands": [
+        {
+          "id": "acme.tasks.sync",
+          "title": "Sync tasks"
+        }
+      ],
+      "views": [
+        {
+          "id": "acme.tasks",
+          "title": "Tasks",
+          "region": "side",
+          "entry": "view/index.html"
+        }
+      ],
+      "toolRenderers": [
+        {
+          "match": "mcp.acme.*",
+          "title": "{input.id}",
+          "body": "table",
+          "columns": [
+            "id",
+            "title",
+            "status"
+          ]
+        }
+      ]
+    }
+  }
+}
