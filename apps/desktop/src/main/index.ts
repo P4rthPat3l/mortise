@@ -1,8 +1,36 @@
 import { join } from "node:path"
-import { app, BrowserWindow, shell } from "electron"
+import {
+  consoleSink,
+  createDiscovery,
+  createGateway,
+  createLogger,
+  defaultFindCli,
+  openCodeServiceClient,
+} from "@mortise/gateway-core"
+import { serverIdSchema } from "@mortise/rpc-contracts"
+import { app, BrowserWindow, MessageChannelMain, shell } from "electron"
+import { CHANNEL_NAME, createGatewayHost } from "./gateway-host.js"
 
-// The gateway host (T-008) will start @mortise/gateway-core here and hand each window a MessagePort channel.
-// Main never contains domain logic; it hosts the gateway and the platform services.
+// Main hosts the app's single gateway and gives each window a private MessagePort channel. It holds
+// engine credentials; renderer code never does. Domain logic stays out of main.
+const logger = createLogger(consoleSink())
+const engineFetch = globalThis.fetch
+
+const host = createGatewayHost({
+  createGateway: () =>
+    createGateway({
+      serverId: serverIdSchema.parse("shared"),
+      discovery: createDiscovery({ client: openCodeServiceClient(), findCli: defaultFindCli }),
+      fetch: engineFetch,
+      logger,
+    }),
+  createChannel: () => {
+    const channel = new MessageChannelMain()
+    return { main: channel.port1, windowPort: channel.port2 }
+  },
+  fetch: engineFetch,
+  logger,
+})
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -15,6 +43,13 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  })
+
+  // The channel is sent on every load, after the preload has registered its forwarder.
+  host.attach({
+    onDidFinishLoad: (listener) => window.webContents.on("did-finish-load", listener),
+    onClosed: (listener) => window.on("closed", listener),
+    sendChannel: (port) => window.webContents.postMessage(CHANNEL_NAME, null, [port]),
   })
 
   window.once("ready-to-show", () => window.show())
@@ -34,11 +69,15 @@ function createWindow() {
 if (!app.requestSingleInstanceLock()) app.quit()
 
 app.whenReady().then(() => {
+  host.start()
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+// Quitting stops our gateway (timers, stream, listeners) and never the shared engine (ADR-0002).
+app.on("before-quit", () => host.dispose())
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit()
