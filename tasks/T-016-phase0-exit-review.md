@@ -2,7 +2,7 @@
 id: T-016
 title: Phase 0 exit review and Phase 1 backlog
 phase: 0
-status: todo
+status: ready
 tier: opus
 depends_on: [T-001, T-002, T-003, T-004, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012, T-013, T-014, T-015]
 covers: [P1, P2, P3, P4, P5, P6, P7, P8]

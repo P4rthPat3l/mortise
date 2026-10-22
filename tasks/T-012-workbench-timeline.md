@@ -2,7 +2,7 @@
 id: T-012
 title: Workbench composition root and streaming timeline
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-008, T-009, T-011]
 covers: [P3, P4, P8]
