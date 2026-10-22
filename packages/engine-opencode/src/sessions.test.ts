@@ -94,6 +94,16 @@ describe.each(VERSIONS)("session reads (%s)", (version) => {
   })
 })
 
+describe("active sessions", () => {
+  it("AC-1: maps the engine's active snapshot to session ids", async () => {
+    const adapter = makeAdapter((url) =>
+      url.pathname === "/api/session/active" ? json({ data: { ses_running: { type: "running" } } }) : undefined,
+    )
+
+    expect(await adapter.activeSessions()).toEqual([sessionId("ses_running")])
+  })
+})
+
 describe("prompt", () => {
   it("AC-4: the same clientMessageId sends the same id and only declared fields", async () => {
     const bodies: string[] = []

@@ -40,6 +40,14 @@ export async function listSessions(client: OpenCodeClient): Promise<SessionSumma
   return response.data.map(toSessionSummary)
 }
 
+/** Ids of the sessions the engine reports as running right now. */
+export async function activeSessions(client: OpenCodeClient): Promise<SessionId[]> {
+  const active = await client.session.active()
+  return Object.entries(active)
+    .filter(([, state]) => state.type === "running")
+    .map(([id]) => sessionId(id))
+}
+
 /** Reads one session. */
 export async function getSession(client: OpenCodeClient, id: SessionId): Promise<SessionSummary> {
   return toSessionSummary(await client.session.get({ sessionID: id }))
