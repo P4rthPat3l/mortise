@@ -12,7 +12,7 @@ last_updated: 2026-10-22
 # Required before any claim in this document may be labeled Current.
 last_verified_commit: 49d4309
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.2.0
+version: 0.2.1
 tags:
   - gateway
   - engine
@@ -32,7 +32,7 @@ related_features: []
 | Field                 | Details                                                                                             |
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                             |
-| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine), the T-005 event stream, the T-006 forwarding handler and the T-009 desktop host are implemented; AC-011's bundle assertion is blocked (§28 Q-007) |
+| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine), the T-005 event stream, the T-006 forwarding handler and the T-009 desktop host are implemented; AC-011 and SEC-005 pass with the credential-specific bundle check (§28 Q-007) |
 | Owner                 | Mortise maintainers                                                                                  |
 | Primary actors        | User, renderer window, gateway (main process), OpenCode service, other clients (official app, TUI)   |
 | Trigger               | Application start; a window opening; a connection state change; a renderer request or subscription   |
@@ -57,8 +57,8 @@ maps to tasks T-004, T-005, T-006 and T-009. Phase 1 (T-004: discovery, probe, c
 connection state machine) is implemented at `1d4669d`; Phase 2 (T-005: the event stream, batching and
 resync) is implemented at `4323cc7`; Phase 3 (T-006: the forwarding handler) is implemented at
 `508aaff`; Phase 4 (T-009: the desktop host and MessagePort channel) is implemented at `49d4309`.
-The rows they own are labeled `Current`. AC-011's bundle assertion remains unresolved because its
-`rg` pattern also matches React DOM and the shared channel schemas (§28 Q-007).**
+The rows they own are labeled `Current`. AC-011 and SEC-005 pass with the credential-specific bundle
+check recorded in §17 and §28 Q-007.
 
 ### Status Legend
 
@@ -100,7 +100,7 @@ a lossy stream.
 | Measure                                  | Target                                       | How measured                                            |
 |------------------------------------------|----------------------------------------------|---------------------------------------------------------|
 | Upstream streams per connected server    | Exactly one, regardless of window count      | Fixture server request count (T-005 AC-6, T-009 AC-2)    |
-| Credential occurrences in renderer build | Zero                                          | `rg` over `apps/desktop/out/renderer` and `out/preload` (T-009 AC-3; the pattern's disposition is Q-007) |
+| Credential markers in renderer build | Zero | No `Basic `, `info.password`, `opencode:` or `endpoint.auth` in `apps/desktop/out/renderer`; no `password`, `authorization` or `Basic ` in `out/preload` (T-009 AC-3) |
 | Connection state after the official app restarts the service | Back to `discovering`, then joined again | Coexistence test (P1, T-013)                             |
 | Timeline after a forced overflow vs a fresh load | Identical                              | Resilience test (P2, T-013)                              |
 
@@ -534,9 +534,8 @@ implemented and tested at `4323cc7` (T-005). BR-019..BR-026 are implemented and 
 
 AC-001..AC-004 are implemented and tested at `1d4669d` (T-004). AC-005..AC-007 are implemented and
 tested at `4323cc7` (T-005); the desktop-host half of AC-007 is covered by the T-009 tests. AC-008 and
-AC-009 are implemented and tested at `508aaff` (T-006). AC-010 is implemented and tested at
-`49d4309` (T-009). AC-011 is **Unknown**: its prescribed bundle search also matches React DOM and
-the shared channel schemas, so the assertion cannot pass as written (§28 Q-007).
+AC-009 are implemented and tested at `508aaff` (T-006). AC-010 and AC-011 are implemented and tested
+at `49d4309` (T-009); AC-011 uses the credential-specific check recorded in §28 Q-007.
 
 ### AC-001: Join an existing service — Status: **Current**
 
@@ -649,18 +648,18 @@ same gateway. Closing a window releases only its subscriptions; `dispose` closes
 disposes the gateway. `transport.test.ts` in `apps/desktop/src/main/` and
 `apps/desktop/src/renderer/` runs both transports over worker-thread `MessageChannel`s.
 
-### AC-011: No credential in the renderer — Status: **Unknown**
+### AC-011: No credential in the renderer — Status: **Current**
 
 **Given** a production build
 **When** the renderer and preload bundles are searched
 **Then** no credential-handling code is present, and window security flags are unchanged
 
-Test: The T-009 build was searched at `49d4309`. The preload bundle is clean. The renderer bundle
-matches `password` and `authorization` only in React DOM's input-type branch and in
-`@mortise/rpc-contracts`' header-validation messages; none of those handles a credential. The
-prescribed `rg "password|authorization"` therefore cannot be empty. The window flags are unchanged
-(`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`). The check's disposition is
-§28 Q-007.
+Test: The T-009 build was searched at `49d4309` with the credential-specific check from §28 Q-007.
+The preload has no `password`, `authorization` or `Basic `. The renderer has no `Basic `,
+`info.password`, `opencode:` or `endpoint.auth`. Its four `password` and `authorization` matches are
+`@mortise/rpc-contracts`' `FORBIDDEN_HEADERS` and header-validation message, and React DOM's
+`password: true` and `elem.type === "password"` branch; none of them handles a credential. The window
+flags are unchanged (`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`).
 
 ### Edge Cases
 
@@ -707,7 +706,7 @@ never emitted (§17).
 | SEC-002 | No password, auth header, pairing token or body content appears in logs      | Secret-free logger with a prohibited-field rule | Current: `connection.test.ts` (SEC-002) and `forward.test.ts` (SEC-002, AC-7) with a capturing logger |
 | SEC-003 | The gateway re-validates the path allowlist and header rules                 | `forward.ts`, defense in depth               | Current: `forward.test.ts` (SEC-003, BR-019, BR-020) |
 | SEC-004 | `set-cookie` is stripped from forwarded responses                            | `forward.ts`                                 | Current: `forward.test.ts` (SEC-004, BR-023)        |
-| SEC-005 | Renderer and preload bundles contain no credential handling                  | Bundle assertion                             | Unknown: the T-009 build's preload is clean; the renderer matches only React DOM and shared-schema text, so the prescribed `rg` cannot be empty (§28 Q-007) |
+| SEC-005 | Renderer and preload bundles contain no credential handling                  | Bundle assertion                             | Current: at `49d4309` the preload has no `password`, `authorization` or `Basic `; the renderer has no `Basic `, `info.password`, `opencode:` or `endpoint.auth` (§28 Q-007) |
 | SEC-006 | The gateway never touches the engine database, data directory or CLI-private files | Only `@opencode/client/service` reads the registration file | Current: `bun run check:deps` passes; the registration is read only through `@opencode/client/service` in `discovery.ts` |
 
 Extensions are out of scope for this feature, but the design keeps ADR-0011 true: nothing in the
@@ -880,9 +879,9 @@ proves no secret is logged.
 
 **Behavior introduced:** One gateway for the app; a `MessageChannelMain` per window whose main end backs a `createServer` channel with `servers.list`, `connection.get` and `engine.fetch`; per-window subscriptions to `connection.changed`, `engine.events` and `engine.resync`; teardown of a window's channel and subscriptions on close; gateway disposal on quit and never an engine stop. The preload forwards the transferred port with `window.postMessage("mortise:channel", "*", event.ports)` and exposes nothing new; the renderer accepts a port only from `event.source === window` with `event.data === "mortise:channel"`.
 
-**Validation:** `gateway-host.test.ts` uses a fake gateway and worker-thread `MessageChannel`s to prove one create/start for two windows, one stream and one connection subscription per channel server, request routing to the shared gateway, per-window teardown, fan-out, and reload replacement. `transport.test.ts` in both `main` and `renderer` runs the channel client and server over `node:worker_threads` ports. `bun run check` and `bun run build` pass at `49d4309`. The manual `bun run dev` check started the app without a sandbox failure, but the installed engine is `2.1.2`, above the supported `<2.1.0`, so the gateway reported `incompatible`; see the task Result. The production renderer bundle is not free of the words `password` and `authorization` because React DOM and the shared channel schemas contain them, so AC-011's prescribed search is blocked (Q-007).
+**Validation:** `gateway-host.test.ts` uses a fake gateway and worker-thread `MessageChannel`s to prove one create/start for two windows, one stream and one connection subscription per channel server, request routing to the shared gateway, per-window teardown, fan-out, and reload replacement. `transport.test.ts` in both `main` and `renderer` runs the channel client and server over `node:worker_threads` ports. `bun run check` and `bun run build` pass at `49d4309`. The manual `bun run dev` check started the app without a sandbox failure, but the installed engine is `2.1.2`, above the supported `<2.1.0`, so the gateway reported `incompatible`; see the task Result. The production renderer bundle is not free of the words `password` and `authorization` because React DOM and the shared channel schemas contain them; the credential-specific check from Q-007 is clean, so AC-011 passes.
 
-**Completion criteria:** AC-010 passes; window security flags are unchanged (`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`). AC-011 is Unknown pending Q-007.
+**Completion criteria:** AC-010 and AC-011 pass; window security flags are unchanged (`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`).
 
 ## 25. Deployment, Migration, and Rollback
 
@@ -935,7 +934,7 @@ own readers. They do not change any ADR. A decision that would change one must s
 | Q-004 | Confirm the batching default: 16 ms (T-005) versus upstream 10 ms and OpenChamber 50 ms.    | Mortise maintainers | T-005     | Resolved |
 | Q-005 | When no compatible service runs but the installed CLI is below the floor, which read-only features remain? | Mortise maintainers | T-004 | Resolved |
 | Q-006 | Should the gateway surface `no-engine` rechecks only on window focus, or also on a timer?   | Mortise maintainers | T-004     | Resolved |
-| Q-007 | The T-009 bundle check `rg "password\|authorization" apps/desktop/out/renderer` matches React DOM's password input branch and `@mortise/rpc-contracts`' header-validation messages, not credential handling. Should SEC-005 and AC-011 use a narrower check (for example, a credential-specific pattern), or should the shared schema text change? | Mortise maintainers | T-009 | Open |
+| Q-007 | The T-009 bundle check `rg "password\|authorization" apps/desktop/out/renderer` matches React DOM's password input branch and `@mortise/rpc-contracts`' header-validation messages, not credential handling. Should SEC-005 and AC-011 use a narrower check (for example, a credential-specific pattern), or should the shared schema text change? | Mortise maintainers | T-009 | Resolved |
 
 ### Answers (maintainer, 2026-10-10)
 
@@ -947,6 +946,10 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 - **Q-004:** 16 ms, one display frame, configurable. It sits between upstream's 10 ms and OpenChamber's 50 ms and matches the renderer's frame batching.
 - **Q-005:** No engine features. The app shell, settings and themes keep working; every engine-backed view shows the update instructions with the installed and minimum versions.
 - **Q-006:** Both. Recheck when a window gains focus, on an explicit "Retry", and on a 30-second timer while in `no-engine`. Discovery is cheap (a file read and one local HTTP probe), but do not poll faster than that.
+
+### Answers (maintainer, 2026-10-22)
+
+- **Q-007:** Replace the broad `password|authorization` search with credential-specific evidence. After `bun run build`, the preload must contain no `password`, `authorization` or `Basic `, and the renderer must contain no `Basic `, `info.password`, `opencode:` or `endpoint.auth`. React DOM's input-type strings and the shared forbidden-header list may remain. AC-011 and SEC-005 use this check; the shared schema text does not change.
 
 ## 29. AI Agent Instructions
 
@@ -989,6 +992,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | 2026-10-11 | 0.1.5   | Relay a handler-thrown `ChannelError` code through `createServer` (`channel.ts` at `cf291d5`) so the forwarding boundary's `forbidden_path`, `engine_unreachable` and `timeout` reach the caller instead of collapsing to `internal` | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.6   | Mode D sync for T-013: added the coexistence (`gateway-core`) and resync (`engine-opencode`) integration suites and the sandbox `--service`, `stateDir`, `reuse` and `dispose` support they need; recorded the real paths in §20 and marked CASE-006 covered | Current | deepseek-v4.1-flash |
 | 2026-10-22 | 0.2.0   | Mode D sync for T-009: the gateway host (`gateway-host.ts`), the main and renderer `transport.ts` files, the preload port forwarding and the debug view are `Current` at `49d4309`; `servers.list` and `connection.get` become `Current`; AC-010 and the two-window half of AC-007 pass. AC-011 and SEC-005 are `Unknown` because the prescribed bundle search matches React DOM and shared-schema text (Q-007) | Current | deepseek-v4.1-flash |
+| 2026-10-22 | 0.2.1   | Resolve Q-007: AC-011 and SEC-005 use a credential-specific bundle check instead of `password\|authorization`, which React DOM and the shared schema list also match. Both become `Current` at `49d4309` | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 

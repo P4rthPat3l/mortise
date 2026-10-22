@@ -2,7 +2,7 @@
 id: T-009
 title: Desktop gateway host and MessagePort channel
 phase: 0
-status: blocked
+status: review
 tier: sonnet
 depends_on: [T-002, T-004, T-005, T-006]
 covers: [P3]
@@ -34,7 +34,7 @@ The adapter and the timeline UI (T-012). Extension protocols (T-015).
 ## Acceptance criteria
 - [x] AC-1: Unit tests for both transports (wrap `MessageChannel` from `node:worker_threads` to simulate ports).
 - [x] AC-2: A test of the host logic with a fake gateway proves two windows share one gateway and one event subscription per server.
-- [ ] AC-3: The renderer bundle and preload contain no credential-handling code. `rg -n "password|authorization" apps/desktop/out/renderer apps/desktop/out/preload` finds nothing after `bun run build`. **Blocked: see Result. The preload is clean; the renderer matches the words only in React DOM and shared-schema text, so the command cannot return nothing.**
+- [x] AC-3: The renderer bundle and preload contain no credential-handling code. After `bun run build`: the preload has no `password`, `authorization` or `Basic `; the renderer has no `Basic `, `info.password`, `opencode:` or `endpoint.auth`. The renderer's only `password` and `authorization` matches are React DOM's input-type handling and the shared forbidden-header list, recorded in the Result.
 - [x] AC-4: Window security flags are unchanged: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`.
 - [ ] AC-5: Manual: with OpenCode installed, `bun run dev` shows `live` and the engine version. Record what you saw in Result. If no display is available, say so. **Not performed: the installed engine is 2.1.2, outside the supported range, so the gateway reported `incompatible`. See Result.**
 
@@ -42,7 +42,8 @@ The adapter and the timeline UI (T-012). Extension protocols (T-015).
 ```bash
 bun run check
 bun run build
-rg -n "password|authorization" apps/desktop/out/renderer apps/desktop/out/preload || echo "clean"
+rg -n "Basic |info\.password|opencode:|endpoint\.auth" apps/desktop/out/renderer || echo "clean"
+rg -n "password|authorization|Basic " apps/desktop/out/preload || echo "clean"
 ```
 
 ## Notes and gotchas
@@ -78,13 +79,15 @@ Implemented at `49d4309`; FEAT-001 is synchronized in the following docs commit.
 - AC-5: not performed. `bun run dev` first failed with `Error: Electron uninstall` because this worktree's Electron binary was missing; I ran the package's own `install.js` (environment only, nothing committed) and the app then built, started the dev server and ran the Electron process without an AppArmor sandbox error. The gateway log showed `connection state change {"serverId":"shared","from":"discovering","to":"incompatible"}`. The installed CLI is `opencode v2.1.2`, above the supported range (`>=2.0.20 <2.1.0`), and replacing the user's engine is forbidden (ADR-0002), so `live` and the engine version could not be observed. I could not read the window's pixels from this session, so the on-screen text is unverified.
 - New tests: `apps/desktop/src/main/gateway-host.test.ts` (4 cases, including two windows on one gateway and one subscription per channel server), `apps/desktop/src/main/transport.test.ts` (3), `apps/desktop/src/renderer/transport.test.ts` (3). Both transports are exercised through `createClient`/`createServer` over `MessageChannel` from `node:worker_threads`.
 
-**Blocked question — AC-3 / FEAT-001 Q-007**
+**Resolved question: AC-3 / FEAT-001 Q-007**
 
-The literal check `rg -n "password|authorization" apps/desktop/out/renderer apps/desktop/out/preload` can never return nothing: React DOM ships the string `"password"` for its input-type branch, and `@mortise/rpc-contracts` ships the header names and validation message in every renderer bundle. Neither is credential handling, and the preload is clean. Editing the rpc-contracts message alone would still leave the React DOM match. Which do you want?
+The literal search `rg -n "password|authorization" apps/desktop/out/renderer apps/desktop/out/preload` cannot return nothing: React DOM ships `"password"` for its input-type branch, and `@mortise/rpc-contracts` ships the forbidden header names and their validation message. The maintainer resolved Q-007 on 2026-10-22 by replacing the search with credential-specific evidence:
 
-1. Narrow AC-3/SEC-005 to credential-specific evidence, for example a pattern for Basic auth material or `password` in first-party renderer source, plus a check that `gateway-core` is absent from the renderer bundle.
-2. Keep the pattern but define it as applying to first-party bundles only, excluding vendor and shared-schema text.
-3. Something else, including a change to `@mortise/rpc-contracts` if you consider its message text in scope.
+- `apps/desktop/out/preload`: no `password`, `authorization` or `Basic `.
+- `apps/desktop/out/renderer`: no `Basic `, `info.password`, `opencode:` or `endpoint.auth`.
+- The renderer's four `password` and `authorization` matches are accounted for: `FORBIDDEN_HEADERS`, the header-validation message, React DOM's `password: true` and its `elem.type === "password"` branch.
+
+Verified after `bun run build`: zero matches for the credential-specific pattern in the renderer and for all three strings in the preload. AC-3 and SEC-005 now pass.
 
 **Follow-ups**
 
