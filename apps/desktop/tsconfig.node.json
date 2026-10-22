@@ -4,5 +4,11 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["electron.vite.config.ts", "src/main", "src/preload"]
+  "include": [
+    "electron.vite.config.ts",
+    "src/main",
+    "src/preload",
+    "src/spikes/extension-sandbox/main",
+    "src/spikes/extension-sandbox/shared"
+  ]
 }

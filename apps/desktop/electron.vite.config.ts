@@ -1,5 +1,10 @@
+import { resolve } from "node:path"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "electron-vite"
+
+// T-015: the spike debug page is a second renderer entry, built only when explicitly asked for. A
+// normal build keeps the product entry point list unchanged and never emits spike.html.
+const spikeBuild = process.env.MORTISE_SPIKE_BUILD === "1"
 
 // Workspace packages export TypeScript source, so they must be bundled rather than externalized.
 const workspacePackages = [
@@ -31,5 +36,17 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react()],
+    ...(spikeBuild
+      ? {
+          build: {
+            rollupOptions: {
+              input: {
+                index: resolve(process.cwd(), "src/renderer/index.html"),
+                spike: resolve(process.cwd(), "src/renderer/spike.html"),
+              },
+            },
+          },
+        }
+      : {}),
   },
 })

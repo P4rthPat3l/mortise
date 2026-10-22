@@ -1,0 +1,46 @@
+:root {
+  color-scheme: dark;
+  font:
+    13px / 1.45 system-ui,
+    sans-serif;
+  background: #101116;
+  color: #e6e6e6;
+}
+
+body {
+  margin: 0;
+  padding: 12px;
+}
+
+.tag {
+  margin: 0;
+  color: #ffb454;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+h1 {
+  margin: 4px 0 8px;
+  font-size: 18px;
+}
+
+#out {
+  min-height: 2.9em;
+  color: #b9bcc7;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+button {
+  background: #262933;
+  color: #e6e6e6;
+  border: 1px solid #454956;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  cursor: pointer;
+}
