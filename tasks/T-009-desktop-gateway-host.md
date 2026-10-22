@@ -2,7 +2,7 @@
 id: T-009
 title: Desktop gateway host and MessagePort channel
 phase: 0
-status: review
+status: done
 tier: sonnet
 depends_on: [T-002, T-004, T-005, T-006]
 covers: [P3]

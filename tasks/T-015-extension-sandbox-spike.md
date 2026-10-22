@@ -2,7 +2,7 @@
 id: T-015
 title: Sandboxed extension spike
 phase: 0
-status: todo
+status: ready
 tier: opus
 depends_on: [T-009]
 covers: [P6]
