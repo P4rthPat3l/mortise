@@ -8,11 +8,11 @@ status: proposed
 implementation_status: in_progress
 owner: Mortise maintainers
 created: 2026-10-10
-last_updated: 2026-10-11
+last_updated: 2026-10-22
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: 31b3238
+last_verified_commit: 49d4309
 # major: breaking contract/permission/storage change. minor: new behavior or rules. patch: corrections and verification.
-version: 0.1.6
+version: 0.2.0
 tags:
   - gateway
   - engine
@@ -32,7 +32,7 @@ related_features: []
 | Field                 | Details                                                                                             |
 |-----------------------|-----------------------------------------------------------------------------------------------------|
 | Document status       | Proposed — awaiting maintainer approval                                                             |
-| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine), the T-005 event stream and the T-006 forwarding handler implemented; the desktop host (T-009) remains |
+| Implementation status | In progress — T-004 (discovery, probe, capabilities, connection state machine), the T-005 event stream, the T-006 forwarding handler and the T-009 desktop host are implemented; AC-011's bundle assertion is blocked (§28 Q-007) |
 | Owner                 | Mortise maintainers                                                                                  |
 | Primary actors        | User, renderer window, gateway (main process), OpenCode service, other clients (official app, TUI)   |
 | Trigger               | Application start; a window opening; a connection state change; a renderer request or subscription   |
@@ -41,7 +41,7 @@ related_features: []
 | Data stores           | Engine server list in client SQLite; engine password in main memory now, OS keychain later           |
 | External systems      | OpenCode v2 engine (`opencode serve --service`), registration file via `@opencode/client/service`    |
 | Feature flag          | Not applicable                                                                                       |
-| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`; T-006 forwarding read at `508aaff`. T-013 added the coexistence and resilience integration tests at `31b3238`. The desktop host (T-009) has no code yet |
+| Last verified         | T-004 code read at `1d4669d`; the T-005 event stream read at `4323cc7`; T-006 forwarding read at `508aaff`; T-013 added the coexistence and resilience integration tests at `31b3238`; the T-009 desktop host read at `49d4309` |
 
 ### At a Glance
 
@@ -56,8 +56,9 @@ gateway adds Basic auth and forwards them, so the password never leaves the main
 maps to tasks T-004, T-005, T-006 and T-009. Phase 1 (T-004: discovery, probe, capabilities and the
 connection state machine) is implemented at `1d4669d`; Phase 2 (T-005: the event stream, batching and
 resync) is implemented at `4323cc7`; Phase 3 (T-006: the forwarding handler) is implemented at
-`508aaff`. The rows they own are labeled `Current`. The desktop host (T-009) has no code yet, so
-nothing it owns is `Current`.**
+`508aaff`; Phase 4 (T-009: the desktop host and MessagePort channel) is implemented at `49d4309`.
+The rows they own are labeled `Current`. AC-011's bundle assertion remains unresolved because its
+`rg` pattern also matches React DOM and the shared channel schemas (§28 Q-007).**
 
 ### Status Legend
 
@@ -65,8 +66,8 @@ Every `Status` value in this document is one of these four. They describe how mu
 has earned, independent of the document and implementation statuses above.
 
 - **Current**: implemented, and read in the code at `last_verified_commit`. Used for the T-004 rows
-  (read at `1d4669d`), the T-005 event stream (read at `4323cc7`) and the T-006 forwarding handler
-  (read at `508aaff`).
+  (read at `1d4669d`), the T-005 event stream (read at `4323cc7`), the T-006 forwarding handler
+  (read at `508aaff`) and the T-009 desktop host (read at `49d4309`).
 - **Planned**: proposed or approved, but not implemented.
 - **Inferred**: consistent with the evidence, but not directly verified against Mortise code.
 - **Unknown**: unresolved. Tracked in §28.
@@ -99,7 +100,7 @@ a lossy stream.
 | Measure                                  | Target                                       | How measured                                            |
 |------------------------------------------|----------------------------------------------|---------------------------------------------------------|
 | Upstream streams per connected server    | Exactly one, regardless of window count      | Fixture server request count (T-005 AC-6, T-009 AC-2)    |
-| Credential occurrences in renderer build | Zero                                          | `rg` over `apps/desktop/out/renderer` and `out/preload` (T-009 AC-3) |
+| Credential occurrences in renderer build | Zero                                          | `rg` over `apps/desktop/out/renderer` and `out/preload` (T-009 AC-3; the pattern's disposition is Q-007) |
 | Connection state after the official app restarts the service | Back to `discovering`, then joined again | Coexistence test (P1, T-013)                             |
 | Timeline after a forced overflow vs a fresh load | Identical                              | Resilience test (P2, T-013)                              |
 
@@ -119,7 +120,7 @@ a lossy stream.
 
 - Event interpretation, status derivation, timeline projection and caching. These belong to the adapter (`@mortise/engine-opencode`) and the store (§BR-018).
 - Isolated-engine mode and remote pairing. Deferred; a short note is in §26.
-- Electron wiring and the MessagePort transport, which are a separate task (T-009) even though they complete this feature's Phase 0 goal.
+- Electron wiring and the MessagePort transport. They live in the desktop host and are described in §24 Phase 4; `@mortise/gateway-core` stays host-neutral.
 - The engine's own agent loop, sessions, tools, permissions and persistence. The engine owns these.
 
 ### Assumptions
@@ -367,14 +368,15 @@ moment it sees `live` or `engine.resync` until its snapshots load. `connection.t
 other transition at `1d4669d`; the event stream (`events.ts`, T-005) reports in through
 `onStreamConnected` and `onStreamLost(reason)`, and reports a stream `401` through `onUnauthorized`.
 The upstream only runs while a service is adopted and at least one subscriber is listening, so the
-last window closing closes it without a state change (CASE-013).
+last window closing closes it without a state change (CASE-013). `gateway-host.ts` creates the
+subscription that keeps a window live and removes it when that window closes (T-009, `49d4309`).
 
 ## 11. Implementation Map
 
 ### Existing Artifacts
 
 Rows were read at the commit in the `Verified` column: the T-004 rows at `1d4669d`, the T-005 rows
-at `4323cc7`, the T-006 rows at `508aaff`.
+at `4323cc7`, the T-006 rows at `508aaff`, and the T-009 rows at `49d4309`.
 
 | Layer        | Responsibility                              | Repository path                             | Main symbol                                                        | Verified  |
 |--------------|---------------------------------------------|---------------------------------------------|--------------------------------------------------------------------|-----------|
@@ -389,15 +391,11 @@ at `4323cc7`, the T-006 rows at `508aaff`.
 | Gateway      | Composition: servers, connection, stream, internals | `packages/gateway-core/src/gateway.ts` | `createGateway`                                               | `4323cc7` |
 | Logging      | Secret-free logger with the prohibited rule | `packages/gateway-core/src/logging.ts`      | `createLogger`, `redactFields`                                     | `1d4669d` |
 | Entry        | Public entry; JSDoc'd exports               | `packages/gateway-core/src/index.ts`        | —                                                                  | `508aaff` |
-
-### Planned Artifacts
-
-| Layer     | Responsibility                              | Planned path                                    | Main symbol              | Change type | Task  |
-|-----------|---------------------------------------------|-------------------------------------------------|--------------------------|-------------|-------|
-| Host      | Create the gateway once; wire per-window MessagePort channels | `apps/desktop/src/main/gateway-host.ts` | `createGatewayHost`      | Create      | T-009 |
-| Host      | `Transport` over `MessagePortMain`           | `apps/desktop/src/main/transport.ts`            | `mainTransport`          | Create      | T-009 |
-| Renderer  | `Transport` over the DOM `MessagePort`       | `apps/desktop/src/renderer/transport.ts`        | `rendererTransport`      | Create      | T-009 |
-| Preload   | Forward the port to the main world           | `apps/desktop/src/preload/index.ts`             | —                        | Change      | T-009 |
+| Host         | Create the gateway once; wire per-window MessagePort channels | `apps/desktop/src/main/gateway-host.ts` | `createGatewayHost`                       | `49d4309` |
+| Host         | `Transport` over `MessagePortMain`          | `apps/desktop/src/main/transport.ts`        | `mainTransport`                                                    | `49d4309` |
+| Renderer     | `Transport` over the DOM `MessagePort`      | `apps/desktop/src/renderer/transport.ts`    | `rendererTransport`                                                | `49d4309` |
+| Preload      | Forward the port to the main world          | `apps/desktop/src/preload/index.ts`         | —                                                                  | `49d4309` |
+| Renderer     | Temporary debug view of the connection      | `packages/workbench/src/app.tsx`            | `App`                                                              | `49d4309` |
 
 ### Generated or Restricted Areas
 
@@ -417,8 +415,7 @@ at `4323cc7`, the T-006 rows at `508aaff`.
 All messages are defined in `@mortise/rpc-contracts` (T-002). Both ends validate every inbound
 message. The gateway produces the three event payloads today (T-004 and T-005); the desktop host
 (T-009) emits them over a channel. The `engine.fetch` handler exists (T-006, §BR-019..BR-026); the
-`servers.list` and `connection.get` handlers exist only as gateway methods and are registered by
-T-009.
+`servers.list` and `connection.get` handlers are registered by the T-009 host at `49d4309`.
 
 ```json
 { "v": 1, "id": "msg_1", "type": "request", "name": "engine.fetch", "payload": {} }
@@ -435,8 +432,8 @@ its code and message through `createServer`; the forwarding boundary relies on t
 
 | Method           | Input                                                                 | Output                | Status  |
 |------------------|-----------------------------------------------------------------------|-----------------------|---------|
-| `servers.list`   | none                                                                  | `ServerRef[]`         | Planned |
-| `connection.get` | `{ serverId }`                                                        | `ConnectionState`     | Planned |
+| `servers.list`   | none                                                                  | `ServerRef[]`         | Current |
+| `connection.get` | `{ serverId }`                                                        | `ConnectionState`     | Current |
 | `engine.fetch`   | `{ serverId, method, path, query?, headers?, body }`                  | `{ status, headers, body }` | Current |
 
 `engine.fetch` constraints (from T-002): `method` is one of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`;
@@ -453,10 +450,11 @@ its code and message through `createServer`; the forwarding boundary relies on t
 | `engine.resync`      | `{ serverId, generation, reason }`             | Current | Before forwarding any event of a new generation (T-005)  |
 
 The payloads above are produced by `gateway.onConnectionChange` and `EventStream.subscribe` today;
-`createServer(...).emit` carries them to a window once T-009 wires the host. `engine.resync.reason` is
-`reconnected` for a network end, `gap` for a stall and `overflow` for a server close. Raw wire events
-are `unknown[]`; the adapter validates them. The gateway never interprets payloads beyond JSON
-parsing and reading `type` (§BR-016).
+the T-009 host subscribes each window's channel server to both and calls `createServer(...).emit`
+(`gateway-host.ts` at `49d4309`). `engine.resync.reason` is `reconnected` for a network end, `gap`
+for a stall and `overflow` for a server close. Raw wire events are `unknown[]`; the adapter
+validates them. The gateway never interprets payloads beyond JSON parsing and reading `type`
+(§BR-016).
 
 ### Engine HTTP Used
 
@@ -535,9 +533,10 @@ implemented and tested at `4323cc7` (T-005). BR-019..BR-026 are implemented and 
 ## 15. Acceptance Criteria and Cases
 
 AC-001..AC-004 are implemented and tested at `1d4669d` (T-004). AC-005..AC-007 are implemented and
-tested at `4323cc7` (T-005), except the desktop-host half of AC-007 (T-009). AC-008..AC-009 are
-implemented and tested at `508aaff` (T-006). Every other criterion is **Untested**; the task that
-will add its test is named.
+tested at `4323cc7` (T-005); the desktop-host half of AC-007 is covered by the T-009 tests. AC-008 and
+AC-009 are implemented and tested at `508aaff` (T-006). AC-010 is implemented and tested at
+`49d4309` (T-009). AC-011 is **Unknown**: its prescribed bundle search also matches React DOM and
+the shared channel schemas, so the assertion cannot pass as written (§28 Q-007).
 
 ### AC-001: Join an existing service — Status: **Current**
 
@@ -603,7 +602,7 @@ mid-batch and asserts no generation-N event is delivered after the generation-N+
 Test: `events.test.ts` (BR-016, BR-017): two events arrive in one batch in order; a malformed payload
 is skipped, logged without its contents, and the next valid event still arrives.
 
-### AC-007: One upstream stream for many subscribers — Status: **Current** (events half)
+### AC-007: One upstream stream for many subscribers — Status: **Current**
 
 **Given** two or more subscribers
 **When** they subscribe to the same server
@@ -612,7 +611,8 @@ is skipped, logged without its contents, and the next valid event still arrives.
 
 Test: `events.test.ts` (BR-011, CASE-013): two subscribers receive the same batch while the fixture
 counts one request; the upstream stays open while a subscriber remains, closes with none, and a stop
-clears every timer. The desktop-host half (`gateway-host.test.ts`, two windows) is T-009.
+clears every timer. `gateway-host.test.ts` (T-009) attaches two windows to one fake gateway and
+proves each channel server holds one subscription, which is removed when its window closes.
 
 ### AC-008: Authenticated forwarding — Status: **Current**
 
@@ -636,21 +636,31 @@ Test: `forward.test.ts` (BR-019, BR-020, BR-024): `..`, a percent-encoded traver
 fixture server sees zero requests. The channel's `engine.fetch` input schema rejects the same inputs
 with `invalid_input` before the handler is reached (`methods.test.ts`, T-002).
 
-### AC-010: Desktop host and two windows — Status: **Planned**
+### AC-010: Desktop host and two windows — Status: **Current**
 
 **Given** the app is ready with two windows
 **When** both connect
 **Then** they share one gateway and one event subscription per server, and each has a private channel
 
-Test: Untested; planned in T-009 (`apps/desktop/src/main/gateway-host.test.ts`).
+Test: `apps/desktop/src/main/gateway-host.test.ts` (AC-2): a fake gateway is created and started
+once; two windows attach, each gets a private channel, and each channel server holds exactly one
+stream subscription and one connection subscription. Both clients answer `servers.list` through the
+same gateway. Closing a window releases only its subscriptions; `dispose` closes the channels and
+disposes the gateway. `transport.test.ts` in `apps/desktop/src/main/` and
+`apps/desktop/src/renderer/` runs both transports over worker-thread `MessageChannel`s.
 
-### AC-011: No credential in the renderer — Status: **Planned**
+### AC-011: No credential in the renderer — Status: **Unknown**
 
 **Given** a production build
 **When** the renderer and preload bundles are searched
 **Then** no credential-handling code is present, and window security flags are unchanged
 
-Test: Untested; planned in T-009 (build assertion over `apps/desktop/out/`).
+Test: The T-009 build was searched at `49d4309`. The preload bundle is clean. The renderer bundle
+matches `password` and `authorization` only in React DOM's input-type branch and in
+`@mortise/rpc-contracts`' header-validation messages; none of those handles a credential. The
+prescribed `rg "password|authorization"` therefore cannot be empty. The window flags are unchanged
+(`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`). The check's disposition is
+§28 Q-007.
 
 ### Edge Cases
 
@@ -697,7 +707,7 @@ never emitted (§17).
 | SEC-002 | No password, auth header, pairing token or body content appears in logs      | Secret-free logger with a prohibited-field rule | Current: `connection.test.ts` (SEC-002) and `forward.test.ts` (SEC-002, AC-7) with a capturing logger |
 | SEC-003 | The gateway re-validates the path allowlist and header rules                 | `forward.ts`, defense in depth               | Current: `forward.test.ts` (SEC-003, BR-019, BR-020) |
 | SEC-004 | `set-cookie` is stripped from forwarded responses                            | `forward.ts`                                 | Current: `forward.test.ts` (SEC-004, BR-023)        |
-| SEC-005 | Renderer and preload bundles contain no credential handling                  | Bundle assertion                             | Untested; planned in T-009 (`rg` over `apps/desktop/out/`) |
+| SEC-005 | Renderer and preload bundles contain no credential handling                  | Bundle assertion                             | Unknown: the T-009 build's preload is clean; the renderer matches only React DOM and shared-schema text, so the prescribed `rg` cannot be empty (§28 Q-007) |
 | SEC-006 | The gateway never touches the engine database, data directory or CLI-private files | Only `@opencode/client/service` reads the registration file | Current: `bun run check:deps` passes; the registration is read only through `@opencode/client/service` in `discovery.ts` |
 
 Extensions are out of scope for this feature, but the design keeps ADR-0011 true: nothing in the
@@ -738,14 +748,15 @@ named `*.integration.test.ts` and are wrapped in `describe.skipIf(!process.env.M
 | Test type   | Coverage                                              | Path                                                |
 |-------------|-------------------------------------------------------|-----------------------------------------------------|
 | Unit        | Discovery, start policy, probe, capabilities, state machine, stream, forwarding | `packages/gateway-core/src/*.test.ts` |
-| Unit        | Desktop host and both transports                      | `apps/desktop/src/main/*.test.ts`, `apps/desktop/src/renderer/*.test.ts` |
+| Unit        | Desktop host and both transports                      | `apps/desktop/src/main/gateway-host.test.ts`, `apps/desktop/src/main/transport.test.ts`, `apps/desktop/src/renderer/transport.test.ts` |
 | Integration | Coexistence: join without replacing, survive a replacement, read-only check of the shared service | `packages/gateway-core/src/coexistence.integration.test.ts` (T-013) |
 | Integration | Resync: a dropped stream and an engine restart rebuild the same timeline | `packages/engine-opencode/src/resync.integration.test.ts` (T-013) |
 
 The integration files are skipped unless `MORTISE_INTEGRATION=1`; the shared-service test additionally needs `MORTISE_SHARED_SERVICE_TEST=1`. They start engines with `startSandbox` from `scripts/engine-sandbox.ts`, which grew `--service` (a temporary registration plus a real replacement), tree reuse for a restart, and `dispose()` (T-013). No single package may import both `gateway-core` and `engine-opencode`, so the resync suite is split: `gateway-core` proves the resync marker against a real engine and `engine-opencode` proves the adapter rebuilds the same timeline.
 
 SSE and forwarding fixtures use a local Node `http` server, so the stream and forwarding tests need
-no engine.
+no engine. The transport tests simulate both ends with `MessageChannel` from `node:worker_threads`,
+and the host test injects a fake gateway, so neither needs Electron or a display.
 
 ### Validation Commands
 
@@ -767,7 +778,7 @@ Only targets that come from a real source are listed. No latency target is inven
 | OPS-003 | Event batching window                  | Default 16 ms, configurable                        | `events.test.ts` (BR-016); confirmed per Q-004      |
 | OPS-004 | Channel request timeout                | 30 s default                                       | T-002                                                 |
 | OPS-005 | Connect timeout for the stream         | 2 s                                                | Upstream `connectTimeout`; `events.test.ts` (OPS-005) |
-| OPS-006 | Upstream streams per connected server  | 1, independent of window count                     | `events.test.ts` (BR-011); T-009 AC-2               |
+| OPS-006 | Upstream streams per connected server  | 1, independent of window count                     | `events.test.ts` (BR-011); `gateway-host.test.ts` (T-009 AC-2) |
 
 Event volume and payload limits are Unknown; the batching window bounds renderer wakeups, and the
 engine bounds the stream at 4,096 queued events per subscriber. Timeouts and retries for forwarded
@@ -799,7 +810,7 @@ values fixed by this document so implementing tasks do not choose them.
 | `@mortise/domain`            | Upstream     | `ServerRef`, `ConnectionState`, `EngineInfo`, `EngineCapabilities` | Provided by T-001; the gateway consumes it            |
 | `@mortise/rpc-contracts`     | Upstream     | Channel methods and events                                        | Provided by T-002; the gateway registers handlers     |
 | `@mortise/engine-opencode`   | Peer         | Uses the gateway's `engine.fetch`; never imported by the gateway  | No direct import; the channel is the boundary         |
-| `@mortise/workbench`         | Downstream   | Consumes connection state and events                              | Debug string view in T-009; full UI in T-012          |
+| `@mortise/workbench`         | Downstream   | Consumes connection state and events                              | Debug string view from T-009 (`packages/workbench/src/app.tsx`); full UI in T-012 |
 | OpenCode engine versions     | External     | A new minor may add capabilities or move the floor                | Declared range plus `untested` state; capability flags |
 
 The gateway is the second of the two packages allowed to import OpenCode (ADR-0004). It must stay
@@ -808,8 +819,7 @@ task and a separate file (`gateway-host.ts`).
 
 ## 24. Implementation Plan
 
-Phases 4 describes future work. Phases 1, 2 and 3 are implemented at `1d4669d`, `4323cc7` and
-`508aaff`.
+Phases 1, 2, 3 and 4 are implemented at `1d4669d`, `4323cc7`, `508aaff` and `49d4309`.
 
 ### Phase 1: Discovery and the connection state machine (T-004) — Status: **Current**
 
@@ -821,7 +831,7 @@ Phases 4 describes future work. Phases 1, 2 and 3 are implemented at `1d4669d`, 
 
 **Validation:** Unit tests cover every transition with injected fakes; `ensure()` is never called with a version and never when a registration exists; no public value or log line contains the password. `bun run check` passes at `1d4669d`.
 
-**Completion criteria:** AC-001..AC-004 pass; `bun run check:deps` holds. AC-007's host-independent part (one gateway per server) is deferred to T-005/T-009 because it needs the stream; T-005 delivered the events half (BR-011), T-009 owns the two-window host half.
+**Completion criteria:** AC-001..AC-004 pass; `bun run check:deps` holds. AC-007's host-independent part (one gateway per server) is deferred to T-005/T-009 because it needs the stream; T-005 delivered the events half (BR-011), and T-009 delivered the two-window host half.
 
 **Recovery:** No persistent state; a bad build is a code rollback.
 
@@ -835,7 +845,7 @@ Phases 4 describes future work. Phases 1, 2 and 3 are implemented at `1d4669d`, 
 
 **Validation:** `events.test.ts` drives a local Node `http` SSE fixture with an injected clock: ordered batching, malformed skip, first-event rejection, heartbeat survival past 45 s, stall and server-close reconnect with resync, the buffered-batch-before-resync ordering pin, backoff 1/2/5/10 s capped, connect timeout, two subscribers on one upstream, the last subscriber closing it, and a clean stop with no pending timers. `gateway.test.ts` proves a stream 401 reaches `unauthorized`.
 
-**Completion criteria:** AC-005..AC-007 pass; `bun run check` passes at `4323cc7`; no open handles after stop. AC-007's desktop-host half remains for T-009.
+**Completion criteria:** AC-005..AC-007 pass; `bun run check` passes at `4323cc7`; no open handles after stop. AC-007's desktop-host half is delivered by T-009 at `49d4309`.
 
 ### Phase 3: Authenticated request forwarding (T-006) — Status: **Current**
 
@@ -862,17 +872,17 @@ proves no secret is logged.
 
 **Recovery:** No persistent state; a bad build is a code rollback.
 
-### Phase 4: Desktop host and MessagePort channel (T-009)
+### Phase 4: Desktop host and MessagePort channel (T-009) — Status: **Current**
 
 **Objective:** Run one gateway in main and give each window a private channel that never holds a credential. Covers P3.
 
-**Expected changes:** `apps/desktop/src/main/gateway-host.ts`, both `transport.ts` files, the preload forwarding, and a temporary debug view in the workbench.
+**Actual changes:** `apps/desktop/src/main/gateway-host.ts` (new: `createGatewayHost`), `apps/desktop/src/main/transport.ts` (new: `mainTransport`), `apps/desktop/src/renderer/transport.ts` (new: `rendererTransport`), the channel forwarding in `apps/desktop/src/preload/index.ts`, the port handshake in `apps/desktop/src/renderer/main.tsx`, and the temporary connection view in `packages/workbench/src/app.tsx`. `apps/desktop/src/main/index.ts` now creates the host at app ready, attaches every window, and disposes it on quit. `apps/desktop/tsconfig.node.json` adds the DOM lib because the sandboxed preload runs in a DOM context.
 
-**Behavior introduced:** The host wiring that turns the gateway into the app's engine connection.
+**Behavior introduced:** One gateway for the app; a `MessageChannelMain` per window whose main end backs a `createServer` channel with `servers.list`, `connection.get` and `engine.fetch`; per-window subscriptions to `connection.changed`, `engine.events` and `engine.resync`; teardown of a window's channel and subscriptions on close; gateway disposal on quit and never an engine stop. The preload forwards the transferred port with `window.postMessage("mortise:channel", "*", event.ports)` and exposes nothing new; the renderer accepts a port only from `event.source === window` with `event.data === "mortise:channel"`.
 
-**Validation:** Unit tests for both transports; a fake gateway proves two windows share one gateway and one subscription; a production build search finds no credential handling.
+**Validation:** `gateway-host.test.ts` uses a fake gateway and worker-thread `MessageChannel`s to prove one create/start for two windows, one stream and one connection subscription per channel server, request routing to the shared gateway, per-window teardown, fan-out, and reload replacement. `transport.test.ts` in both `main` and `renderer` runs the channel client and server over `node:worker_threads` ports. `bun run check` and `bun run build` pass at `49d4309`. The manual `bun run dev` check started the app without a sandbox failure, but the installed engine is `2.1.2`, above the supported `<2.1.0`, so the gateway reported `incompatible`; see the task Result. The production renderer bundle is not free of the words `password` and `authorization` because React DOM and the shared channel schemas contain them, so AC-011's prescribed search is blocked (Q-007).
 
-**Completion criteria:** AC-010..AC-011 pass; window security flags unchanged.
+**Completion criteria:** AC-010 passes; window security flags are unchanged (`sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`). AC-011 is Unknown pending Q-007.
 
 ## 25. Deployment, Migration, and Rollback
 
@@ -925,6 +935,7 @@ own readers. They do not change any ADR. A decision that would change one must s
 | Q-004 | Confirm the batching default: 16 ms (T-005) versus upstream 10 ms and OpenChamber 50 ms.    | Mortise maintainers | T-005     | Resolved |
 | Q-005 | When no compatible service runs but the installed CLI is below the floor, which read-only features remain? | Mortise maintainers | T-004 | Resolved |
 | Q-006 | Should the gateway surface `no-engine` rechecks only on window focus, or also on a timer?   | Mortise maintainers | T-004     | Resolved |
+| Q-007 | The T-009 bundle check `rg "password\|authorization" apps/desktop/out/renderer` matches React DOM's password input branch and `@mortise/rpc-contracts`' header-validation messages, not credential handling. Should SEC-005 and AC-011 use a narrower check (for example, a credential-specific pattern), or should the shared schema text change? | Mortise maintainers | T-009 | Open |
 
 ### Answers (maintainer, 2026-10-10)
 
@@ -977,6 +988,7 @@ These answers are binding for T-004, T-005 and T-009. Where they change a rule a
 | 2026-10-11 | 0.1.4   | Mode D sync for T-006: `forward.ts` is `Current` at `508aaff`; BR-019..BR-026, AC-008, AC-009, SEC-003 and SEC-004 move to `Current`; added the `FORWARD_TIMEOUT_MS` constant to §22 | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.5   | Relay a handler-thrown `ChannelError` code through `createServer` (`channel.ts` at `cf291d5`) so the forwarding boundary's `forbidden_path`, `engine_unreachable` and `timeout` reach the caller instead of collapsing to `internal` | Current | deepseek-v4.1-flash |
 | 2026-10-11 | 0.1.6   | Mode D sync for T-013: added the coexistence (`gateway-core`) and resync (`engine-opencode`) integration suites and the sandbox `--service`, `stateDir`, `reuse` and `dispose` support they need; recorded the real paths in §20 and marked CASE-006 covered | Current | deepseek-v4.1-flash |
+| 2026-10-22 | 0.2.0   | Mode D sync for T-009: the gateway host (`gateway-host.ts`), the main and renderer `transport.ts` files, the preload port forwarding and the debug view are `Current` at `49d4309`; `servers.list` and `connection.get` become `Current`; AC-010 and the two-window half of AC-007 pass. AC-011 and SEC-005 are `Unknown` because the prescribed bundle search matches React DOM and shared-schema text (Q-007) | Current | deepseek-v4.1-flash |
 
 ## 31. Related Resources
 
