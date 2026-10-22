@@ -1,47 +1,61 @@
-import type { ConnectionState } from "@mortise/domain"
 import type { Channel } from "@mortise/rpc-contracts"
+import { ModuleHostProvider } from "@mortise/sdk"
 import { useEffect, useState } from "react"
+import { createWorkbenchRuntime, type WorkbenchRuntime } from "./bootstrap/runtime"
+import { WorkbenchShell } from "./shell"
+import "@mortise/ui/tokens.css"
+import "./app.css"
 
-// Temporary debug shell for T-009. T-011 replaces it with the composition root that wires the
-// adapter, core and modules; until then it proves the window holds a working gateway channel.
+/** The workbench entry: boot the composition root once per gateway channel. */
 export function App({ channel }: { readonly channel: Channel }) {
-  const [state, setState] = useState<ConnectionState>({ phase: "discovering" })
-  const [error, setError] = useState<string | null>(null)
+  const [runtime, setRuntime] = useState<WorkbenchRuntime>()
+  const [error, setError] = useState<string>()
 
   useEffect(() => {
     let cancelled = false
-    const unsubscribe = channel.subscribe("connection.changed", ({ state: next }) => {
-      if (!cancelled) setState(next)
-    })
-
-    void (async () => {
-      try {
-        const servers = await channel.request("servers.list", undefined)
-        const server = servers[0]
-        if (server === undefined || cancelled) return
-        const current = await channel.request("connection.get", { serverId: server.id })
-        if (!cancelled) setState(current)
-      } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "the gateway did not answer")
-      }
-    })()
+    let created: WorkbenchRuntime | undefined
+    void createWorkbenchRuntime({ channel })
+      .then((next) => {
+        if (cancelled) {
+          next.dispose()
+          return
+        }
+        created = next
+        setRuntime(next)
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : "The gateway did not answer")
+      })
 
     return () => {
       cancelled = true
-      unsubscribe()
+      created?.dispose()
     }
   }, [channel])
 
-  const version = "info" in state ? state.info.version : undefined
+  if (error !== undefined) {
+    return (
+      <main className="app-message">
+        <h1>Mortise</h1>
+        <p className="error" role="alert">
+          {error}
+        </p>
+      </main>
+    )
+  }
+
+  if (runtime === undefined) {
+    return (
+      <main className="app-message">
+        <h1>Mortise</h1>
+        <p className="muted">Connecting to the engine…</p>
+      </main>
+    )
+  }
 
   return (
-    <main>
-      <h1>Mortise</h1>
-      <p>
-        Connection: {state.phase}
-        {version === undefined ? "" : ` (OpenCode ${version})`}
-      </p>
-      {error === null ? null : <p>Gateway error: {error}</p>}
-    </main>
+    <ModuleHostProvider host={runtime.host}>
+      <WorkbenchShell runtime={runtime} />
+    </ModuleHostProvider>
   )
 }

@@ -13,3 +13,5 @@ export type { SettingSchema, SettingsLayer, WritableSettingsLayer } from "./sett
 export { SettingsService } from "./settings.js"
 export type { ReadableStore, Store } from "./store.js"
 export { createStore } from "./store.js"
+export type { TimelinePartRef, TimelineStore } from "./timeline.js"
+export { createTimelineStore } from "./timeline.js"

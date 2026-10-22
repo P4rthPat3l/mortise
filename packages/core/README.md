@@ -18,6 +18,7 @@ Contribution registries, the command service, the keybinding resolver, the layer
 | `keybindings.ts` | `Platform`, `KeyEvent`, `Chord`, `Keybinding`, `KeybindingConflict`, `Keybindings`, `parseKeybinding` | One- and two-step bindings, `mod` mapped per platform, conflict reporting. |
 | `settings.ts` | `SettingsLayer`, `WritableSettingsLayer`, `SettingSchema`, `SettingsService` | Layered values (defaults < user < project) validated by contributed schemas. |
 | `store.ts` | `ReadableStore`, `Store`, `createStore` | Reactive value with `batch` and `select`, shaped for `useSyncExternalStore`. |
+| `timeline.ts` | `TimelineStore`, `TimelinePartRef`, `createTimelineStore` | Normalized timeline by session, item and part id with narrow subscriptions, patch application, snapshot merge and batched notification. |
 | `events.ts` | `DomainEventType`, `DomainEventListener`, `EventBus`, `createEventBus` | Typed, past-tense bus over the domain `DomainEvent`. |
 
 The store's `subscribe` returns an unsubscribe function rather than a `Disposable` so it matches React's `useSyncExternalStore` without a wrapper. Everything else that can be withdrawn returns a `Disposable`.

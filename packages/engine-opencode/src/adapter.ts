@@ -10,7 +10,7 @@ import type {
   TimelineItem,
 } from "@mortise/domain"
 import { OpenCode, type OpenCodeClient } from "@opencode/client"
-import { type EventDiagnostics, eventDiagnostics, translate } from "./events.js"
+import { createEventTranslator, type EventDiagnostics } from "./events.js"
 import { newMessageId } from "./ids.js"
 import {
   answerForm,
@@ -21,6 +21,7 @@ import {
   type PermissionDecision,
 } from "./requests.js"
 import {
+  activeSessions,
   type CreateSessionInput,
   createSession,
   getSession,
@@ -50,6 +51,8 @@ export interface EngineAdapter {
   readonly serverId: ServerId
   readonly client: OpenCodeClient
   listSessions(): Promise<SessionSummary[]>
+  /** Ids of sessions that are running, from the engine's active-session snapshot. */
+  activeSessions(): Promise<SessionId[]>
   getSession(id: SessionId): Promise<SessionSummary>
   createSession(input?: CreateSessionInput): Promise<SessionSummary>
   prompt(input: PromptInput): Promise<void>
@@ -81,10 +84,12 @@ export interface EngineAdapter {
 /** Creates an adapter over one engine. */
 export function createAdapter(options: AdapterOptions): EngineAdapter {
   const client = OpenCode.make({ baseUrl: options.baseUrl, fetch: options.fetch })
+  const translator = createEventTranslator()
   return {
     serverId: options.serverId,
     client,
     listSessions: () => listSessions(client),
+    activeSessions: () => activeSessions(client),
     getSession: (id) => getSession(client, id),
     createSession: (input) => createSession(client, input),
     prompt: (input) => promptSession(client, input),
@@ -102,8 +107,8 @@ export function createAdapter(options: AdapterOptions): EngineAdapter {
     answerPermission: (input) => answerPermission(client, input),
     answerForm: (input) => answerForm(client, input),
     cancelForm: (input) => cancelForm(client, input),
-    translate,
-    diagnostics: eventDiagnostics,
+    translate: translator.translate,
+    diagnostics: translator.diagnostics,
     newMessageId,
   }
 }
