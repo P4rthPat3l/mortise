@@ -172,7 +172,9 @@ export default defineExtension(async (host) => {
 - Extension frames use `sandbox="allow-scripts"` without `allow-same-origin`. That gives them an opaque origin with no access to the parent DOM, cookies or storage.
 - Files are served from `mortise-ext://<id>/` with `default-src 'none'`, scripts and styles limited to the package, and `connect-src 'none'`. All input and output goes through the host bridge.
 - Main denies navigation, new windows and all device permission requests that come from extension frames.
-- **[Open question]** Whether Electron's site isolation puts these opaque-origin frames in separate renderer processes needs a measurement in the prototype. If they share the host's process, a renderer exploit in an extension frame reaches the host. The fallback is a `WebContentsView` per untrusted extension, at a higher memory cost.
+- **[Verified]** Electron puts these opaque-origin frames in a renderer process separate from the host window. T-015 measured Electron 44.7.0 on Linux: the host renderer and the `mortise-ext://` frame had different OS process ids, and ten frames of one extension shared one extension process. Ten views cost about 116 MiB of extension working set: about 106 MiB of fixed process cost, then 1.0–1.5 MiB per extra view. A 1,000-call `postMessage` round trip had a 0.2 ms median and 0.3–0.4 ms p95. See [the spike findings](../research/2026-10-22-extension-sandbox-spike.md). The `WebContentsView` fallback is not needed for host isolation; it remains the option for web embeds and for extension-to-extension process isolation if a two-id measurement shows different extension origins sharing a process.
+- **[Verified]** The host page must allow the extension origins it embeds in `frame-src` (`mortise-ext://<id>` or `mortise-ext:`). Do that without widening `script-src` or `connect-src`. The production renderer's CSP was not widened by the spike; the spike's dev-only host page carried the allowance.
+- **[Verified]** The bridge must authenticate by `event.source` identity. A sandboxed frame serializes its origin as `"null"`, so `event.origin`, a token in the payload and a direction field alone are not trustworthy. The direction and version checks reject malformed messages; `event.source` decides whether the frame is allowed to send at all.
 
 ### 7.11 Implementation mechanisms compared
 
@@ -182,8 +184,8 @@ export default defineExtension(async (host) => {
 | Statically bundled modules | None | Native | Minimal | First-party only |
 | Dynamically loaded in-process code (the `.ocdx` approach) | None | Native | Low | Trusted tier or developer mode only |
 | Web Workers | Same origin as the host unless created inside a sandboxed frame | None | Low | Not needed; a hidden sandboxed frame covers background logic with one mechanism |
-| Sandboxed iframes | Opaque origin plus CSP | Inside a frame | One document per view | Default for third-party code |
-| `WebContentsView` per extension | Separate process | Inside a native view | High memory | Fallback if frame isolation proves weak; also for web embeds |
+| Sandboxed iframes | Opaque origin plus CSP; measured separate from the host renderer | Inside a frame | One document per view; measured ~106 MiB for the first frame, ~1.0–1.5 MiB per extra same-origin view | Default for third-party code |
+| `WebContentsView` per extension | Separate process | Inside a native view | High memory, plus native view management | Fallback for cross-extension process isolation or web embeds |
 | `utilityProcess` or child process | OS user | None | Medium | T3 services only |
 | WASM JavaScript interpreter (for example QuickJS) | Strong | None | High complexity | Rejected; solves a problem iframes already solve |
 
