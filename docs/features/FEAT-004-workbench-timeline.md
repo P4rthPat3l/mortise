@@ -5,12 +5,12 @@ title: Workbench composition root and streaming timeline
 # status: proposed | approved | active | superseded | retired
 status: proposed
 # implementation_status: not_started | in_progress | shipped_unverified | shipped_verified | sunsetting
-implementation_status: shipped_unverified
+implementation_status: shipped_verified
 owner: Mortise maintainer
 created: 2026-10-22
 last_updated: 2026-10-22
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: null
+last_verified_commit: c4fe0f2
 version: 0.1.1
 tags:
   - workbench
@@ -36,7 +36,7 @@ related_features:
 | Field                 | Details                                                                                                  |
 |-----------------------|----------------------------------------------------------------------------------------------------------|
 | Document status       | Proposed                                                                                                 |
-| Implementation status | Shipped in T-012; verification recorded in the commit after the implementation                           |
+| Implementation status | Shipped and verified at `c4fe0f2` (T-012)                                                                |
 | Owner                 | Mortise maintainer                                                                                       |
 | Primary actors        | A person using the desktop window; the composition root wiring the gateway channel to modules            |
 | Trigger               | Window boot, session selection, a prompt, a gateway event batch, or a resync marker                      |
@@ -44,7 +44,7 @@ related_features:
 | Entry points          | `packages/workbench/src/index.ts` (`App`), `packages/workbench/src/bootstrap/` (`createWorkbenchRuntime`) |
 | Data stores           | In-memory session list, timeline store, per-session load status, connection state. No persistence        |
 | Feature flag          | Not applicable                                                                                           |
-| Last verified         | Local checks and an isolated 2.0.26 run; commit recorded in the final docs sync                          |
+| Last verified         | 2026-10-22 at `c4fe0f2`                                                                                  |
 
 **Status legend.** Every `Status` value below is one of: **Current** (read in the code at
 `last_verified_commit`) · **Planned** (not implemented) · **Inferred** (not directly verified) ·
@@ -259,13 +259,13 @@ Nothing in the timeline store notifies the session list.
 |----------------------|----------------------------------------------------------------------|-----------------------------------------------------------|-----------------------------------|-------------|
 | Core timeline store  | Normalized state, narrow subscriptions, patches, snapshots, batching  | `packages/core/src/timeline.ts`                           | `createTimelineStore`, `TimelineStore` | New    |
 | Gateway fetch        | Encode a DOM request into `engine.fetch` and decode the response      | `packages/workbench/src/bootstrap/engine-fetch.ts`        | `createGatewayFetch`              | New         |
-| Frame batching       | Coalesce domain events into one frame                                 | `packages/workbench/src/bootstrap/frame.ts`               | `createFrameScheduler`            | New         |
+| Frame batching       | Coalesce domain events into one frame                                 | `packages/workbench/src/bootstrap/frame.ts`               | `frameScheduler`, `FrameScheduler` | New         |
 | Composition root     | Create stores, adapter, modules, subscriptions and resync             | `packages/workbench/src/bootstrap/runtime.ts`             | `createWorkbenchRuntime`          | New         |
 | Sessions module      | Session list view, selection and refresh                              | `packages/workbench/src/modules/sessions/`                | `Sessions`, `SessionsView`        | New         |
 | Timeline module      | Timeline view, item and part leaves                                   | `packages/workbench/src/modules/timeline/`                | `Timeline`, `TimelineView`, `StreamingText` | New |
 | Composer module      | Prompt box with one client message id per attempt                     | `packages/workbench/src/modules/composer/`                | `ComposerView`, `ComposerService` | New         |
 | Design tokens        | Light and dark base variables                                        | `packages/ui/src/tokens.css`                              | CSS variables                     | New         |
-| App shell            | Mount the runtime and lay out the three views                         | `packages/workbench/src/app.tsx`                          | `App`, `WorkbenchShell`           | Rewritten   |
+| App shell            | Mount the runtime and lay out the three views                         | `packages/workbench/src/app.tsx`, `src/shell.tsx`         | `App`, `WorkbenchShell`           | Rewritten   |
 | Adapter activity     | Domain-typed active session ids                                       | `packages/engine-opencode/src/sessions.ts`, `adapter.ts`  | `activeSessions`                  | Changed     |
 | Adapter diagnostics  | Counters per adapter instance, no module-level state                  | `packages/engine-opencode/src/events.ts`, `adapter.ts`    | `createEventTranslator`           | Changed     |
 
@@ -447,4 +447,4 @@ order to read them. No phases remain.
 | Date       | Version | Change                                                        | Status  | PR or author |
 |------------|---------|---------------------------------------------------------------|---------|--------------|
 | 2026-10-22 | 0.1.0   | Initial design, written in Mode A before coding.               | Planned | T-012        |
-| 2026-10-22 | 0.1.1   | Implemented and verified; planned paths and statuses synchronized with the code. | Shipped | T-012 |
+| 2026-10-22 | 0.1.1   | Implemented; planned paths and statuses synchronized with the code. Verified at `c4fe0f2`. | Shipped | T-012 (`c4fe0f2`) |

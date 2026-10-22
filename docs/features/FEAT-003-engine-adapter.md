@@ -10,7 +10,7 @@ owner: Mortise maintainer
 created: 2026-10-10
 last_updated: 2026-10-22
 # Required before any claim in this document may be labeled Current.
-last_verified_commit: e7726c2
+last_verified_commit: c4fe0f2
 version: 0.1.2
 tags:
   - engine
@@ -37,7 +37,7 @@ FEAT-002 is reserved for the module system (T-011), so this feature takes the ne
 | Field                 | Details                                                                                          |
 |-----------------------|--------------------------------------------------------------------------------------------------|
 | Document status       | Proposed                                                                                         |
-| Implementation status | Shipped and verified at `e7726c2`                                                                 |
+| Implementation status | Shipped and verified at `c4fe0f2`                                                                 |
 | Owner                 | Mortise maintainer                                                                               |
 | Primary actors        | The composition root (T-012) and the gateway (T-004…T-006) through an injected `fetch`          |
 | Trigger               | A read (session list/get/create/active, message page, pending requests) or one wire event        |
@@ -45,7 +45,7 @@ FEAT-002 is reserved for the module system (T-011), so this feature takes the ne
 | Entry points          | `packages/engine-opencode/src/index.ts` (`createAdapter`, `adapter.translate`)                   |
 | Data stores           | None. The adapter is stateless; credentials live in the gateway (C7)                            |
 | Feature flag          | Not applicable                                                                                   |
-| Last verified         | 2026-10-22, code changed by T-012; commit in the final sync                                        |
+| Last verified         | 2026-10-22 at `c4fe0f2`                                                                            |
 
 **Status legend.** Every `Status` value below is one of: **Current** (read in the code at `last_verified_commit`) · **Planned** (not implemented) · **Inferred** (not directly verified) · **Unknown**.
 
@@ -311,7 +311,7 @@ bun scripts/diff-openapi.ts packages/engine-opencode/fixtures/2.0.20/openapi.jso
 | 2026-10-10 | 0.1.0 | Initial plan. | Planned | T-008 |
 | 2026-10-10 | 0.1.0 | Implemented; all acceptance criteria Current at `44fc431`. | Shipped | T-008 (`44fc431`) |
 | 2026-10-10 | 0.1.1 | Recorded 2.0.20, ran the contract tests once per fixture version, and added the OpenAPI compatibility diff and nightly workflow; verified at `e7726c2`. | Shipped | T-014 (`e7726c2`) |
-| 2026-10-22 | 0.1.2 | Moved diagnostics onto the adapter instance, added `activeSessions`, and updated the contract tests after the T-012 review. | Shipped | T-012 |
+| 2026-10-22 | 0.1.2 | Moved diagnostics onto the adapter instance, added `activeSessions`, and updated the contract tests after the T-012 review; verified at `c4fe0f2`. | Shipped | T-012 (`c4fe0f2`) |
 
 ## 31. Related Resources
 

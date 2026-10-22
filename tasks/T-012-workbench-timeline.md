@@ -55,7 +55,7 @@ bun run build
 
 ## Result
 
-**Status:** review. Implemented on `t012-workbench-timeline`; not pushed.
+**Status:** review. Implemented on `t012-workbench-timeline` at `c4fe0f2`; not pushed.
 
 ### What changed
 
@@ -104,6 +104,9 @@ bun run build
   the DOM and captured screenshots through the Electron DevTools protocol. The user's 2.1.2 engine
   and its directories were never stopped, reconfigured or written. The sandbox and process trees
   were stopped and removed afterwards.
+  - The run was repeated after the shell was reduced to rendering the views the composition root
+    supplies. The second run started from three timeline items, sent another prompt, and finished
+    with five items: the new user message and its assistant reply.
   - Environment note: the first `bun run dev` failed with `Error: Electron uninstall` because the
     Electron package postinstall had not downloaded its binary in this worktree. Running the
     package's own `install.js` fixed the local install; no app or sandbox setting was changed.
